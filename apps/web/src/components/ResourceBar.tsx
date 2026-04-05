@@ -1,9 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { calculatePlanetProduction } from '@ember-galaxies/shared';
 
 export function ResourceBar() {
   const { selectedPlanet, updatePlanet } = useGameStore();
   const [loading, setLoading] = useState(false);
+  const [displayResources, setDisplayResources] = useState({
+    iron: 0, silver: 0, ember: 0, h2: 0, energy: 0,
+  });
+  const lastUpdateRef = useRef<number>(Date.now());
+
+  // Sync display resources when planet or resources change
+  useEffect(() => {
+    if (!selectedPlanet) return;
+    setDisplayResources({
+      iron: selectedPlanet.iron,
+      silver: selectedPlanet.silver,
+      ember: selectedPlanet.ember,
+      h2: selectedPlanet.h2,
+      energy: selectedPlanet.energy,
+    });
+    lastUpdateRef.current = Date.now();
+  }, [selectedPlanet?.id, selectedPlanet?.iron, selectedPlanet?.silver, selectedPlanet?.ember, selectedPlanet?.h2, selectedPlanet?.energy]);
+
+  // Live-update resources every second
+  useEffect(() => {
+    if (!selectedPlanet) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const elapsedSeconds = (now - lastUpdateRef.current) / 1000;
+      lastUpdateRef.current = now;
+
+      const production = calculatePlanetProduction(selectedPlanet.buildings ?? []);
+
+      setDisplayResources((prev) => ({
+        iron: prev.iron + production.iron * elapsedSeconds / 3600,
+        silver: prev.silver + production.silver * elapsedSeconds / 3600,
+        ember: prev.ember + production.ember * elapsedSeconds / 3600,
+        h2: prev.h2 + production.h2 * elapsedSeconds / 3600,
+        energy: prev.energy + production.energy * elapsedSeconds / 3600,
+      }));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [selectedPlanet?.id]);
 
   if (!selectedPlanet) return null;
 
@@ -14,11 +55,11 @@ export function ResourceBar() {
   };
 
   const resources = [
-    { name: 'Iron', value: selectedPlanet.iron, icon: '🔩', color: 'text-gray-300' },
-    { name: 'Silver', value: selectedPlanet.silver, icon: '💎', color: 'text-cyan-300' },
-    { name: 'Ember', value: selectedPlanet.ember, icon: '🔥', color: 'text-orange-300' },
-    { name: 'H2', value: selectedPlanet.h2, icon: '⛽', color: 'text-purple-300' },
-    { name: 'Energy', value: selectedPlanet.energy, icon: '⚡', color: 'text-yellow-300' },
+    { name: 'Iron', value: displayResources.iron, icon: '🔩', color: 'text-gray-300' },
+    { name: 'Silver', value: displayResources.silver, icon: '💎', color: 'text-cyan-300' },
+    { name: 'Ember', value: displayResources.ember, icon: '🔥', color: 'text-orange-300' },
+    { name: 'H2', value: displayResources.h2, icon: '⛽', color: 'text-purple-300' },
+    { name: 'Energy', value: displayResources.energy, icon: '⚡', color: 'text-yellow-300' },
   ];
 
   const addResources = async () => {
@@ -40,8 +81,14 @@ export function ResourceBar() {
   return (
     <div className="bg-galaxy-dark border-b border-galaxy-purple py-2">
       <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
-        <div className="text-sm text-gray-400">
-          {selectedPlanet.name}
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🌍</span>
+          <div>
+            <div className="text-white font-semibold">{selectedPlanet.name}</div>
+            <div className="text-gray-500 text-sm font-mono">
+              G{selectedPlanet.system?.galaxyIndex ?? '?'}.{selectedPlanet.system?.index ?? '?'}.{selectedPlanet.slot}
+            </div>
+          </div>
         </div>
         <div className="flex space-x-6 items-center">
           <div className="flex space-x-6">

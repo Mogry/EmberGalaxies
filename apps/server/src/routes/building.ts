@@ -95,8 +95,18 @@ buildingRoutes.post('/upgrade', async (c) => {
     }),
   ]);
 
-  const updated = await prisma.building.findUnique({ where: { id: existing.id } });
-  return c.json(updated);
+  // Fetch full planet with relations
+  const updatedPlanet = await prisma.planet.findUnique({
+    where: { id: planetId },
+    include: { system: { include: { star: true } }, buildings: true, shipyards: true, owner: true },
+  });
+
+  // Add galaxyIndex
+  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+  const galaxyIndex = galaxies.findIndex((g) => g.id === updatedPlanet!.system.galaxyId) + 1;
+  const planetWithGalaxy = { ...updatedPlanet, system: { ...updatedPlanet!.system, galaxyIndex } };
+
+  return c.json(planetWithGalaxy);
 });
 
 // Cancel building upgrade
@@ -116,16 +126,42 @@ buildingRoutes.post('/cancel', async (c) => {
     return c.json({ error: 'Building is not upgrading' }, 400);
   }
 
-  // Cancel upgrade - no refund
-  const updated = await prisma.building.update({
-    where: { id: building.id },
-    data: {
-      isUpgrading: false,
-      upgradeFinishAt: null,
-    },
+  // Get cost to refund
+  const cost = getBuildingUpgradeCost(buildingType, building.level);
+
+  // Refund resources and cancel upgrade
+  await prisma.$transaction([
+    cost ? prisma.planet.update({
+      where: { id: planetId },
+      data: {
+        iron: { increment: cost.iron },
+        silver: { increment: cost.silver },
+        ember: { increment: cost.ember ?? 0 },
+        h2: { increment: cost.h2 ?? 0 },
+        energy: { increment: cost.energy ?? 0 },
+      },
+    }) : prisma.planet.update({ where: { id: planetId }, data: {} }),
+    prisma.building.update({
+      where: { id: building.id },
+      data: {
+        isUpgrading: false,
+        upgradeFinishAt: null,
+      },
+    }),
+  ]);
+
+  // Fetch full planet with relations
+  const planet = await prisma.planet.findUnique({
+    where: { id: planetId },
+    include: { system: { include: { star: true } }, buildings: true, shipyards: true, owner: true },
   });
 
-  return c.json(updated);
+  // Add galaxyIndex
+  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+  const galaxyIndex = galaxies.findIndex((g) => g.id === planet!.system.galaxyId) + 1;
+  const planetWithGalaxy = { ...planet, system: { ...planet!.system, galaxyIndex } };
+
+  return c.json(planetWithGalaxy);
 });
 
 // Start new building construction
@@ -194,5 +230,16 @@ buildingRoutes.post('/construct', async (c) => {
     }),
   ]);
 
-  return c.json({ success: true, finishAt }, 201);
+  // Fetch full planet with relations
+  const updatedPlanet = await prisma.planet.findUnique({
+    where: { id: planetId },
+    include: { system: { include: { star: true } }, buildings: true, shipyards: true, owner: true },
+  });
+
+  // Add galaxyIndex
+  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+  const galaxyIndex = galaxies.findIndex((g) => g.id === updatedPlanet!.system.galaxyId) + 1;
+  const planetWithGalaxy = { ...updatedPlanet, system: { ...updatedPlanet!.system, galaxyIndex } };
+
+  return c.json(planetWithGalaxy);
 });

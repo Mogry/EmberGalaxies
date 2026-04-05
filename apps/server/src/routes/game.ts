@@ -60,7 +60,7 @@ gameRoutes.get('/galaxy/:galaxy/system/:system', async (c) => {
     return c.json({ error: 'System not found' }, 404);
   }
 
-  return c.json({ galaxy: dbGalaxy, system, planets: system.planets });
+  return c.json({ galaxy: { ...dbGalaxy, index: galaxyIndex }, system, planets: system.planets });
 });
 
 // Get planet by ID
@@ -83,7 +83,15 @@ gameRoutes.get('/planet/:planetId', async (c) => {
     return c.json({ error: 'Planet not found' }, 404);
   }
 
-  return c.json(planet);
+  // Add galaxyIndex
+  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+  const galaxyIndex = galaxies.findIndex((g) => g.id === planet.system.galaxyId) + 1;
+  const planetWithGalaxy = {
+    ...planet,
+    system: { ...planet.system, galaxyIndex },
+  };
+
+  return c.json(planetWithGalaxy);
 });
 
 // Get player by ID
@@ -193,6 +201,8 @@ gameRoutes.get('/planets/:playerId', async (c) => {
   // Process offline production first so resources are up-to-date
   await processExpiredTimers();
 
+  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+
   const planets = await prisma.planet.findMany({
     where: { ownerId: playerId },
     include: {
@@ -202,7 +212,13 @@ gameRoutes.get('/planets/:playerId', async (c) => {
     },
   });
 
-  return c.json(planets);
+  // Attach galaxyIndex to each planet's system
+  const planetsWithGalaxyIndex = planets.map((p) => {
+    const galaxyIndex = galaxies.findIndex((g) => g.id === p.system.galaxyId) + 1;
+    return { ...p, system: { ...p.system, galaxyIndex } };
+  });
+
+  return c.json(planetsWithGalaxyIndex);
 });
 
 // Create starter planet for player
@@ -283,7 +299,80 @@ gameRoutes.post('/planet/starter/:playerId', async (c) => {
     },
   });
 
-  return c.json(completePlanet, 201);
+  // Add galaxyIndex (reuse existing 'galaxies' variable)
+  const galaxyIndex = galaxies.findIndex((g) => g.id === completePlanet!.system.galaxyId) + 1;
+  const planetWithGalaxy = {
+    ...completePlanet,
+    system: { ...completePlanet!.system, galaxyIndex },
+  };
+
+  return c.json(planetWithGalaxy, 201);
+});
+
+// Colonize an unoccupied planet (dev mode - bypasses fleet system)
+gameRoutes.post('/planet/:planetId/colonize', async (c) => {
+  const { planetId } = c.req.param();
+
+  const planet = await prisma.planet.findUnique({
+    where: { id: planetId },
+    include: { system: { include: { star: true } } },
+  });
+
+  if (!planet) {
+    return c.json({ error: 'Planet not found' }, 404);
+  }
+
+  if (planet.ownerId) {
+    return c.json({ error: 'Planet already occupied' }, 400);
+  }
+
+  // Get the human player
+  const player = await prisma.player.findFirst({
+    where: { isBot: false },
+  });
+
+  if (!player) {
+    return c.json({ error: 'No player found' }, 404);
+  }
+
+  const colonized = await prisma.planet.update({
+    where: { id: planetId },
+    data: {
+      ownerId: player.id,
+      name: `${player.name}'s Kolonie`,
+      iron: 500,
+      silver: 250,
+      ember: 0,
+      h2: 0,
+      energy: 0,
+      lastSeen: new Date(),
+    },
+  });
+
+  // Create starter buildings
+  await prisma.building.createMany({
+    data: [
+      { planetId: colonized.id, type: 'zentrale', level: 1 },
+      { planetId: colonized.id, type: 'iron_mine', level: 1 },
+      { planetId: colonized.id, type: 'silver_mine', level: 1 },
+      { planetId: colonized.id, type: 'fusion_plant', level: 1 },
+    ],
+  });
+
+  const completePlanet = await prisma.planet.findUnique({
+    where: { id: colonized.id },
+    include: { system: { include: { star: true } }, buildings: true, shipyards: true, owner: true },
+  });
+
+  // Add galaxyIndex
+  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+  const galaxyIndex = galaxies.findIndex((g) => g.id === completePlanet!.system.galaxyId) + 1;
+  const planetWithGalaxy = {
+    ...completePlanet,
+    system: { ...completePlanet!.system, galaxyIndex },
+  };
+
+  return c.json(planetWithGalaxy, 201);
 });
 
 // DEV MODE: Add 5000 of each resource to a planet

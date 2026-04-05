@@ -9,7 +9,7 @@ interface SystemResponse {
 }
 
 export function GalaxyView() {
-  const { setSelectedPlanet, setView } = useGameStore();
+  const { setSelectedPlanet, setView, setPlanets, planets: myPlanets } = useGameStore();
   const [galaxyIndex, setGalaxyIndex] = useState(1);
   const [systemIndex, setSystemIndex] = useState(1);
   const [systemData, setSystemData] = useState<SystemResponse | null>(null);
@@ -61,12 +61,28 @@ export function GalaxyView() {
   }, [systemIndex, galaxyIndex]);
 
   const handlePlanetClick = async (planet: Planet) => {
-    // Fetch full planet data with buildings from DB
-    const res = await fetch(`/api/game/planet/${planet.id}`);
+    // Don't navigate if clicking the colonize button
+    if (planet.ownerId) {
+      const res = await fetch(`/api/game/planet/${planet.id}`);
+      if (res.ok) {
+        const fullPlanet = await res.json();
+        setSelectedPlanet(fullPlanet);
+        setView('planet');
+      }
+    }
+  };
+
+  const handleColonize = async (planet: Planet, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Planet "${planet.name}" besiedeln?`)) return;
+
+    const res = await fetch(`/api/game/planet/${planet.id}/colonize`, { method: 'POST' });
     if (res.ok) {
-      const fullPlanet = await res.json();
-      setSelectedPlanet(fullPlanet);
-      setView('planet');
+      const colonized = await res.json();
+      // Add to local planets list
+      setPlanets([...myPlanets, colonized]);
+      // Refresh system data
+      loadSystem();
     }
   };
 
@@ -184,7 +200,12 @@ export function GalaxyView() {
                       {planet.ownerId ? (
                         <span className="text-amber-400">Besetzt</span>
                       ) : (
-                        <span className="text-gray-600">Unbesetzt</span>
+                        <button
+                          onClick={(e) => handleColonize(planet, e)}
+                          className="px-3 py-1 bg-ember-600 hover:bg-ember-500 text-white text-sm rounded transition-colors"
+                        >
+                          Besiedeln
+                        </button>
                       )}
                     </div>
                   </div>

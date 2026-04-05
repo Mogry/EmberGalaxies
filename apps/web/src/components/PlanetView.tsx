@@ -1,7 +1,24 @@
 import { useState } from 'react';
 import type { Planet, BuildingType, Building } from '@ember-galaxies/shared';
+import { calculateProduction, BUILDING_PRODUCTION, getBuildingUpgradeCost } from '@ember-galaxies/shared';
 import { useGameStore } from '../stores/gameStore';
 import { GameTimer } from './GameTimer';
+
+const RESOURCE_COLORS: Record<string, string> = {
+  iron: 'text-blue-400',
+  silver: 'text-purple-400',
+  ember: 'text-orange-400',
+  h2: 'text-cyan-400',
+  energy: 'text-yellow-400',
+};
+
+const RESOURCE_ICONS: Record<string, string> = {
+  iron: '🔩',
+  silver: '💎',
+  ember: '🔥',
+  h2: '⛽',
+  energy: '⚡',
+};
 
 interface PlanetViewProps {
   planet: Planet;
@@ -22,34 +39,61 @@ const BUILDING_INFO: Record<BuildingType, { name: string; icon: string; descript
   dummy_building: { name: 'Dummy-Bau', icon: '📦', description: 'Platzhalter für Fastbuild' },
 };
 
-// Berechnet den Ist-Zustand aus der DB - JEDER RENDER neu
 function getBuildingState(building: Building | undefined) {
   const now = new Date();
 
-  // Kein Building existiert
   if (!building) {
     return { exists: false as const, level: 0, isUpgrading: false, upgradeFinishAt: null };
   }
 
-  // Kein upgradeFinishAt = kein Ausbau
   if (!building.upgradeFinishAt) {
     return { exists: true as const, level: building.level, isUpgrading: false, upgradeFinishAt: null };
   }
 
   const finishTime = new Date(building.upgradeFinishAt);
 
-  // Upgrade ist noch nicht fertig
   if (now < finishTime) {
     return { exists: true as const, level: building.level, isUpgrading: true, upgradeFinishAt: building.upgradeFinishAt };
   }
 
-  // Upgrade ist fertig (Zeit ist vorbei)
-  // level wird durch processExpiredTimers bereits erhöht, aber zur Sicherheit +1
   return { exists: true as const, level: building.level + 1, isUpgrading: false, upgradeFinishAt: null };
 }
 
 export function PlanetView({ planet }: PlanetViewProps) {
-  const { updatePlanet } = useGameStore();
+  const { updatePlanet, planets, setSelectedPlanet } = useGameStore();
+
+  const myPlanets = planets
+    .filter((p) => p.ownerId === planet.ownerId)
+    .sort((a, b) => {
+      const aPos = (a.system?.galaxyIndex ?? 0) * 100000 + (a.system?.index ?? 0) * 100 + a.slot;
+      const bPos = (b.system?.galaxyIndex ?? 0) * 100000 + (b.system?.index ?? 0) * 100 + b.slot;
+      return aPos - bPos;
+    });
+
+  const currentIndex = myPlanets.findIndex((p) => p.id === planet.id);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < myPlanets.length - 1;
+
+  const goToPrevPlanet = async () => {
+    if (!hasPrev) return;
+    const prevPlanet = myPlanets[currentIndex - 1];
+    const res = await fetch(`/api/game/planet/${prevPlanet.id}`);
+    if (res.ok) {
+      const fullPlanet = await res.json();
+      setSelectedPlanet(fullPlanet);
+    }
+  };
+
+  const goToNextPlanet = async () => {
+    if (!hasNext) return;
+    const nextPlanet = myPlanets[currentIndex + 1];
+    const res = await fetch(`/api/game/planet/${nextPlanet.id}`);
+    if (res.ok) {
+      const fullPlanet = await res.json();
+      setSelectedPlanet(fullPlanet);
+    }
+  };
+
   const [buildingAction, setBuildingAction] = useState<string | null>(null);
 
   const handleBuild = async (buildingType: BuildingType) => {
@@ -62,7 +106,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
         body: JSON.stringify({ planetId: planet.id, buildingType }),
       });
       if (res.ok) {
-        const updated = await fetch(`/api/game/planet/${planet.id}`).then(r => r.json());
+        const updated = await res.json();
         updatePlanet(updated);
       }
     } finally {
@@ -80,7 +124,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
         body: JSON.stringify({ planetId: planet.id, buildingType }),
       });
       if (res.ok) {
-        const updated = await fetch(`/api/game/planet/${planet.id}`).then(r => r.json());
+        const updated = await res.json();
         updatePlanet(updated);
       }
     } finally {
@@ -95,33 +139,66 @@ export function PlanetView({ planet }: PlanetViewProps) {
       body: JSON.stringify({ planetId: planet.id, buildingType }),
     });
     if (res.ok) {
-      const updated = await fetch(`/api/game/planet/${planet.id}`).then(r => r.json());
+      const updated = await res.json();
       updatePlanet(updated);
     }
   };
 
   const handleTimerComplete = async () => {
-    // Refetch um den aktuellen Zustand zu laden
-    const updated = await fetch(`/api/game/planet/${planet.id}`).then(r => r.json());
+    const updated = await fetch(`/api/game/planet/${planet.id}`).then((r) => r.json());
     updatePlanet(updated);
   };
 
   const getBuilding = (type: BuildingType): Building | undefined => {
-    return planet.buildings?.find(b => b.type === type);
+    return planet.buildings?.find((b) => b.type === type);
+  };
+
+  const formatCost = (cost: { iron?: number; silver?: number; ember?: number; h2?: number; energy?: number } | null) => {
+    if (!cost) return null;
+    const parts: string[] = [];
+    if (cost.iron) parts.push(`🔩${Math.round(cost.iron)}`);
+    if (cost.silver) parts.push(`💎${Math.round(cost.silver)}`);
+    if (cost.ember) parts.push(`🔥${Math.round(cost.ember)}`);
+    if (cost.h2) parts.push(`⛽${Math.round(cost.h2)}`);
+    if (cost.energy) parts.push(`⚡${Math.round(cost.energy)}`);
+    return parts.join(' ');
   };
 
   return (
     <div className="space-y-6">
       <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple p-6">
-        <h2 className="text-2xl font-bold text-white mb-2">
-          🌍 {planet.name}
-        </h2>
-        <p className="text-gray-400">
-          Position: System {planet.system?.index ?? '?'}
-        </p>
-        <p className="text-gray-500 text-sm">
-          Felder: {planet.fieldsUsed} / {planet.fieldsMax}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              🌍 {planet.name}
+            </h2>
+            <p className="text-gray-400">
+              Position: System {planet.system?.index ?? '?'}
+            </p>
+            <p className="text-gray-500 text-sm">
+              Felder: {planet.fieldsUsed} / {planet.fieldsMax}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToPrevPlanet}
+              disabled={!hasPrev}
+              className="px-4 py-2 rounded font-semibold text-white bg-galaxy-purple hover:bg-purple-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              ◀ Planet
+            </button>
+            <span className="text-gray-500 text-sm px-2">
+              {currentIndex + 1} / {myPlanets.length}
+            </span>
+            <button
+              onClick={goToNextPlanet}
+              disabled={!hasNext}
+              className="px-4 py-2 rounded font-semibold text-white bg-galaxy-purple hover:bg-purple-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              Planet ▶
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple overflow-hidden">
@@ -131,7 +208,6 @@ export function PlanetView({ planet }: PlanetViewProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
           {Object.entries(BUILDING_INFO).map(([type, info]) => {
             const building = getBuilding(type as BuildingType);
-            // Berechne Zustand aus DB (Source of Truth)
             const state = getBuildingState(building);
 
             return (
@@ -149,10 +225,19 @@ export function PlanetView({ planet }: PlanetViewProps) {
                   </div>
                   <div className="text-right">
                     <div className="text-ember-400 font-bold">Stufe {state.level}</div>
+                    {state.level > 0 && (() => {
+                      const config = BUILDING_PRODUCTION[type as keyof typeof BUILDING_PRODUCTION];
+                      if (!config) return null;
+                      const prod = calculateProduction(type as keyof typeof BUILDING_PRODUCTION, state.level);
+                      return (
+                        <div className={`text-xs ${RESOURCE_COLORS[config.resource]} mt-1`}>
+                          +{prod.toFixed(1)}/h {RESOURCE_ICONS[config.resource]}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
-                {/* Upgrade läuft - Timer anzeigen */}
                 {state.isUpgrading && state.upgradeFinishAt ? (
                   <div className="mt-2 flex items-center justify-between">
                     <div>
@@ -171,23 +256,35 @@ export function PlanetView({ planet }: PlanetViewProps) {
                     </button>
                   </div>
                 ) : !state.exists ? (
-                  /* Building existiert nicht - Bauen Button */
-                  <button
-                    onClick={() => handleBuild(type as BuildingType)}
-                    disabled={buildingAction !== null}
-                    className="mt-2 px-3 py-1 bg-ember-600 hover:bg-ember-500 text-white text-sm rounded transition-colors w-full disabled:opacity-50"
-                  >
-                    {buildingAction === type ? 'Baue...' : 'Bauen'}
-                  </button>
+                  (() => {
+                    const cost = getBuildingUpgradeCost(type as BuildingType, 0);
+                    const costText = formatCost(cost);
+                    return (
+                      <button
+                        onClick={() => handleBuild(type as BuildingType)}
+                        disabled={buildingAction !== null}
+                        className="mt-2 px-3 py-2 bg-ember-600 hover:bg-ember-500 text-white rounded transition-colors w-full disabled:opacity-50"
+                      >
+                        <div className="font-semibold">{buildingAction === type ? 'Baue...' : 'Bauen'}</div>
+                        {costText && <div className="text-sm text-gray-300 mt-0.5">{costText}</div>}
+                      </button>
+                    );
+                  })()
                 ) : (
-                  /* Building existiert, kein Upgrade läuft - Ausbauen Button */
-                  <button
-                    onClick={() => handleUpgrade(type as BuildingType)}
-                    disabled={buildingAction !== null}
-                    className="mt-2 px-3 py-1 bg-ember-600 hover:bg-ember-500 text-white text-sm rounded transition-colors w-full disabled:opacity-50"
-                  >
-                    {buildingAction === type ? 'Baue...' : (state.level === 0 ? 'Stufe 1 bauen' : 'Ausbauen')}
-                  </button>
+                  (() => {
+                    const cost = getBuildingUpgradeCost(type as BuildingType, state.level);
+                    const costText = formatCost(cost);
+                    return (
+                      <button
+                        onClick={() => handleUpgrade(type as BuildingType)}
+                        disabled={buildingAction !== null}
+                        className="mt-2 px-3 py-2 bg-ember-600 hover:bg-ember-500 text-white rounded transition-colors w-full disabled:opacity-50"
+                      >
+                        <div className="font-semibold">{buildingAction === type ? 'Baue...' : (state.level === 0 ? 'Stufe 1 bauen' : 'Ausbauen')}</div>
+                        {costText && <div className="text-sm text-gray-300 mt-0.5">{costText}</div>}
+                      </button>
+                    );
+                  })()
                 )}
               </div>
             );

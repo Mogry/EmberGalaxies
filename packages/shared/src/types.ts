@@ -20,6 +20,7 @@ export interface System {
   id: string;
   index: number;
   galaxyId: string;
+  galaxyIndex?: number;
   createdAt: Date;
   updatedAt: Date;
   star?: Star;

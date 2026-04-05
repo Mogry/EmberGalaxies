@@ -5,6 +5,7 @@ import { PlanetView } from './components/PlanetView';
 import { FleetView } from './components/FleetView';
 import { ResearchView } from './components/ResearchView';
 import { ResourceBar } from './components/ResourceBar';
+import { PlanetListView } from './components/PlanetListView';
 import { useWebSocket } from './hooks/useWebSocket';
 
 function App() {
@@ -57,10 +58,10 @@ function App() {
       <nav className="" style={{ backgroundColor: '#050510', borderBottom: '1px solid #1a1a3a' }}>
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex space-x-1">
-            {['galaxy', 'planet', 'fleet', 'research'].map((v) => (
+            {['galaxy', 'planets', 'planet', 'fleet', 'research'].map((v) => (
               <button
                 key={v}
-                onClick={() => setView(v as 'galaxy' | 'planet' | 'fleet' | 'research')}
+                onClick={() => setView(v as 'galaxy' | 'planets' | 'planet' | 'fleet' | 'research')}
                 className={`px-4 py-3 capitalize`}
                 style={{
                   color: view === v ? '#fb923c' : '#9ca3af',
@@ -75,6 +76,7 @@ function App() {
                 }}
               >
                 {v === 'galaxy' && '🌌 '}
+                {v === 'planets' && '🪐 '}
                 {v === 'planet' && '🌍 '}
                 {v === 'fleet' && '🚀 '}
                 {v === 'research' && '🔬 '}
@@ -87,6 +89,7 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         {view === 'galaxy' && <GalaxyView />}
+        {view === 'planets' && <PlanetListView />}
         {view === 'planet' && selectedPlanet && <PlanetView planet={selectedPlanet} />}
         {view === 'fleet' && <FleetView />}
         {view === 'research' && <ResearchView />}

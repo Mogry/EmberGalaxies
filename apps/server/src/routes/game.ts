@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { prisma } from '../db/client';
 import { processExpiredTimers, touchPlanets } from '../utils/timerCompletion';
+import { DEV_MODE } from '../utils/dev';
 
 export const gameRoutes = new Hono();
 
@@ -110,7 +111,14 @@ gameRoutes.post('/player', async (c) => {
   });
 
   if (existingPlayer) {
-    return c.json(existingPlayer);
+    // Process offline production for all planets before returning
+    await processExpiredTimers();
+    // Re-fetch with updated planet data
+    const refreshed = await prisma.player.findUnique({
+      where: { id: existingPlayer.id },
+      include: { planets: { include: { buildings: true } } },
+    });
+    return c.json(refreshed);
   }
 
   // No human player exists yet — create exactly one
@@ -181,6 +189,9 @@ gameRoutes.post('/player', async (c) => {
 // Get all planets for a player
 gameRoutes.get('/planets/:playerId', async (c) => {
   const { playerId } = c.req.param();
+
+  // Process offline production first so resources are up-to-date
+  await processExpiredTimers();
 
   const planets = await prisma.planet.findMany({
     where: { ownerId: playerId },
@@ -274,3 +285,23 @@ gameRoutes.post('/planet/starter/:playerId', async (c) => {
 
   return c.json(completePlanet, 201);
 });
+
+// DEV MODE: Add 5000 of each resource to a planet
+if (DEV_MODE) {
+  gameRoutes.post('/dev/resources/:planetId', async (c) => {
+    const { planetId } = c.req.param();
+
+    const planet = await prisma.planet.update({
+      where: { id: planetId },
+      data: {
+        iron:    { increment: 5000 },
+        silver:  { increment: 5000 },
+        ember:   { increment: 5000 },
+        h2:      { increment: 5000 },
+        energy:  { increment: 5000 },
+      },
+    });
+
+    return c.json({ success: true, planet });
+  });
+}

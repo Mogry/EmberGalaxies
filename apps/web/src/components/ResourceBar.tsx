@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useGameStore } from '../stores/gameStore';
 
 export function ResourceBar() {
-  const { selectedPlanet } = useGameStore();
+  const { selectedPlanet, updatePlanet } = useGameStore();
+  const [loading, setLoading] = useState(false);
 
   if (!selectedPlanet) return null;
 
@@ -19,21 +21,58 @@ export function ResourceBar() {
     { name: 'Energy', value: selectedPlanet.energy, icon: '⚡', color: 'text-yellow-300' },
   ];
 
+  const addResources = async () => {
+    if (!selectedPlanet || loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/game/dev/resources/${selectedPlanet.id}`, { method: 'POST' });
+      if (res.ok) {
+        const { planet } = await res.json();
+        updatePlanet(planet);
+      }
+    } catch (e) {
+      console.error('Failed to add resources:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-galaxy-dark border-b border-galaxy-purple py-2">
       <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
         <div className="text-sm text-gray-400">
           {selectedPlanet.name}
         </div>
-        <div className="flex space-x-6">
-          {resources.map((r) => (
-            <div key={r.name} className="flex items-center space-x-2">
-              <span>{r.icon}</span>
-              <span className={`font-mono ${r.color}`}>
-                {formatNumber(r.value)}
-              </span>
-            </div>
-          ))}
+        <div className="flex space-x-6 items-center">
+          <div className="flex space-x-6">
+            {resources.map((r) => (
+              <div key={r.name} className="flex items-center space-x-2">
+                <span>{r.icon}</span>
+                <span className={`font-mono ${r.color}`}>
+                  {formatNumber(r.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+          {import.meta.env.DEV && (
+            <button
+              onClick={addResources}
+              disabled={loading}
+              title="+5k resources (DEV)"
+              style={{
+                backgroundColor: '#1a1a3a',
+                border: '1px solid #fb923c',
+                color: '#fb923c',
+                borderRadius: '4px',
+                padding: '2px 8px',
+                fontSize: '11px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.5 : 1,
+              }}
+            >
+              +5k
+            </button>
+          )}
         </div>
       </div>
     </div>

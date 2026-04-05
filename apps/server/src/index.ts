@@ -6,9 +6,7 @@ import { fleetRoutes } from './routes/fleet';
 import { buildingRoutes } from './routes/building';
 import { researchRoutes } from './routes/research';
 import { shipyardRoutes } from './routes/shipyard';
-import { addClient, removeClientFromAll, broadcastToPlayer } from './websocket/broadcast';
-import { prisma } from './db/client';
-import { calculatePlanetProduction } from '@ember-galaxies/shared';
+import { addClient, removeClientFromAll } from './websocket/broadcast';
 
 const { websocket, upgradeWebSocket } = createBunWebSocket();
 
@@ -66,59 +64,6 @@ app.get('/ws', upgradeWebSocket((c) => {
   };
 }));
 
-// 60-second interval for resource updates to connected players
-setInterval(async () => {
-  // Get all unique playerIds with active connections
-  // This is imported from broadcast module but we need to iterate over connected clients
-  // We'll fetch fresh state for each player and broadcast resource updates
-  try {
-    // Get all players with active WebSocket connections
-    // Note: This is a simple approach - in production you'd want to track this more efficiently
-    const players = await prisma.player.findMany({
-      where: { id: { not: 'dummy' } }, // Get all players
-      include: {
-        planets: {
-          include: { buildings: true }
-        }
-      },
-    });
-
-    for ( const player of players) {
-      // Calculate current production for all planets
-      let totalResources = { iron: 0, silver: 0, ember: 0, h2: 0, energy: 0 };
-
-      for (const planet of player.planets) {
-        const production = calculatePlanetProduction(planet.buildings as any);
-        totalResources.iron += production.iron;
-        totalResources.silver += production.silver;
-        totalResources.ember += production.ember;
-        totalResources.h2 += production.h2;
-        totalResources.energy += production.energy;
-      }
-
-      // Only broadcast if player has planets
-      if (player.planets.length > 0) {
-        broadcastToPlayer(player.id, {
-          type: 'resource_update',
-          data: {
-            resources: totalResources,
-            planets: player.planets.map(p => ({
-              id: p.id,
-              iron: p.iron,
-              silver: p.silver,
-              ember: p.ember,
-              h2: p.h2,
-              energy: p.energy,
-            })),
-          },
-          timestamp: new Date().toISOString(),
-        });
-      }
-    }
-  } catch (e) {
-    console.error('Error in resource broadcast interval:', e);
-  }
-}, 60_000); // Every 60 seconds
 
 // For Bun server
 export default {

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useGameStore } from './stores/gameStore';
 import { GalaxyView } from './components/GalaxyView';
 import { PlanetView } from './components/PlanetView';
@@ -7,11 +8,46 @@ import { ResourceBar } from './components/ResourceBar';
 import { useWebSocket } from './hooks/useWebSocket';
 
 function App() {
-  const { player, selectedPlanet, view, setView } = useGameStore();
+  const { player, selectedPlanet, view, setView, setPlayer, setPlanets } = useGameStore();
+  const [initializing, setInitializing] = useState(false);
   useWebSocket();
 
+  useEffect(() => {
+    if (player || initializing) return;
+    setInitializing(true);
+
+    const init = async () => {
+      try {
+        // Get or create the single human player
+        const playerRes = await fetch('/api/game/player', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Commander', isBot: false }),
+        });
+        if (!playerRes.ok) throw new Error('Failed to get/create player');
+        const newPlayer = await playerRes.json();
+        setPlayer(newPlayer);
+
+        // Load planets
+        const planetsRes = await fetch(`/api/game/planets/${newPlayer.id}`);
+        if (planetsRes.ok) {
+          const planets = await planetsRes.json();
+          setPlanets(planets);
+        }
+      } catch (error) {
+        console.error('Failed to initialize game:', error);
+      }
+    };
+
+    init();
+  }, [player, initializing, setPlayer, setPlanets]);
+
   if (!player) {
-    return <StartScreen />;
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'radial-gradient(circle at center, #1a1a3a 0%, #050510 100%)' }}>
+        <p style={{ color: '#9ca3af' }}>Lädt...</p>
+      </div>
+    );
   }
 
   return (
@@ -55,67 +91,6 @@ function App() {
         {view === 'fleet' && <FleetView />}
         {view === 'research' && <ResearchView />}
       </main>
-    </div>
-  );
-}
-
-function StartScreen() {
-  const { setPlayer, setPlanets } = useGameStore();
-
-  const handleStart = async () => {
-    try {
-      // Create player with unique name
-      const playerName = `Commander_${Date.now().toString(36)}`;
-      const playerRes = await fetch('/api/game/player', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: playerName, isBot: false }),
-      });
-
-      if (!playerRes.ok) {
-        throw new Error('Failed to create player');
-      }
-
-      const player = await playerRes.json();
-
-      // Create starter planet
-      const planetRes = await fetch(`/api/game/planet/starter/${player.id}`, {
-        method: 'POST',
-      });
-
-      if (!planetRes.ok) {
-        throw new Error('Failed to create planet');
-      }
-
-      const planet = await planetRes.json();
-
-      setPlayer(player);
-      setPlanets([planet]);
-    } catch (error) {
-      console.error('Failed to start game:', error);
-      alert('Fehler beim Starten des Spiels. Siehe Console für Details.');
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'radial-gradient(circle at center, #1a1a3a 0%, #050510 100%)' }}>
-      <div className="text-center">
-        <h1 className="text-6xl font-bold mb-4" style={{ color: '#fb923c' }}>
-          EmberGalaxies
-        </h1>
-        <p className="mb-8 text-lg" style={{ color: '#9ca3af' }}>
-          Erobern Sie die Galaxie
-        </p>
-        <button
-          onClick={handleStart}
-          className="px-8 py-4 text-white font-semibold text-xl"
-          style={{ backgroundColor: '#ea580c', borderRadius: '8px', cursor: 'pointer' }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f97316'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ea580c'}
-        >
-          Spiel starten
-        </button>
-      </div>
     </div>
   );
 }

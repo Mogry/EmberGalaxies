@@ -85,19 +85,113 @@ gameRoutes.get('/planet/:planetId', async (c) => {
   return c.json(planet);
 });
 
-// Create new player
+// Get player by ID
+gameRoutes.get('/player/:playerId', async (c) => {
+  const { playerId } = c.req.param();
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+  });
+
+  if (!player) {
+    return c.json({ error: 'Player not found' }, 404);
+  }
+
+  return c.json(player);
+});
+
+// Create or get the single human player
+// Returns existing human player if one exists, otherwise creates exactly one with a starter planet
 gameRoutes.post('/player', async (c) => {
+  // Check if a human player already exists
+  const existingPlayer = await prisma.player.findFirst({
+    where: { isBot: false },
+    include: { planets: true },
+  });
+
+  if (existingPlayer) {
+    return c.json(existingPlayer);
+  }
+
+  // No human player exists yet — create exactly one
   const body = await c.req.json();
   const { name, isBot = false } = body;
 
   const player = await prisma.player.create({
+    data: { name, isBot },
+  });
+
+  // Find a slot for the starter planet
+  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+  if (galaxies.length === 0) {
+    return c.json({ error: 'No galaxies found. Run seed first.' }, 500);
+  }
+
+  const galaxy = galaxies[0];
+  const systems = await prisma.system.findMany({
+    where: { galaxyId: galaxy.id },
+    include: { planets: true },
+  });
+
+  const systemWithSpace = systems.reduce((best, current) => {
+    const bestEmpty = 30 - best.planets.length;
+    const currentEmpty = 30 - current.planets.length;
+    return currentEmpty > bestEmpty ? current : best;
+  });
+
+  const usedSlots = new Set(systemWithSpace.planets.map((p) => p.slot));
+  let slot = 1;
+  while (usedSlots.has(slot) && slot <= 30) slot++;
+  if (slot > 30) {
+    return c.json({ error: 'No free slots' }, 500);
+  }
+
+  const planet = await prisma.planet.create({
     data: {
-      name,
-      isBot,
+      name: `${name}'s Homeworld`,
+      slot,
+      systemId: systemWithSpace.id,
+      ownerId: player.id,
+      iron: 500,
+      silver: 250,
+      ember: 0,
+      h2: 0,
+      energy: 0,
+      lastSeen: new Date(),
     },
   });
 
-  return c.json(player, 201);
+  await prisma.building.createMany({
+    data: [
+      { planetId: planet.id, type: 'zentrale', level: 1 },
+      { planetId: planet.id, type: 'iron_mine', level: 1 },
+      { planetId: planet.id, type: 'silver_mine', level: 1 },
+      { planetId: planet.id, type: 'fusion_plant', level: 1 },
+    ],
+  });
+
+  const completePlanet = await prisma.planet.findUnique({
+    where: { id: planet.id },
+    include: { system: { include: { star: true } }, buildings: true, shipyards: true },
+  });
+
+  return c.json({ ...player, planets: [completePlanet] }, 201);
+});
+
+// Get all planets for a player
+gameRoutes.get('/planets/:playerId', async (c) => {
+  const { playerId } = c.req.param();
+
+  const planets = await prisma.planet.findMany({
+    where: { ownerId: playerId },
+    include: {
+      system: { include: { star: true } },
+      buildings: true,
+      shipyards: true,
+    },
+  });
+
+  return c.json(planets);
 });
 
 // Create starter planet for player

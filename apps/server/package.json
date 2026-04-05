@@ -1,0 +1,25 @@
+{
+  "name": "@ember-galaxies/server",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:seed": "bun run prisma/seed.ts"
+  },
+  "dependencies": {
+    "@ember-galaxies/shared": "workspace:*",
+    "@prisma/client": "^5.12.0",
+    "hono": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prisma": "^5.12.0"
+  },
+  "prisma": {
+    "seed": "bun run prisma/seed.ts"
+  }
+}

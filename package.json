@@ -1,0 +1,21 @@
+{
+  "name": "ember-galaxies",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"bun run dev:server\" \"bun run dev:web\"",
+    "dev:server": "bun run --filter @ember-galaxies/server dev",
+    "dev:web": "bun run --filter @ember-galaxies/web dev",
+    "db:up": "docker-compose up -d",
+    "db:down": "docker-compose down",
+    "db:migrate": "bun run --filter @ember-galaxies/server db:migrate",
+    "db:studio": "bun run --filter @ember-galaxies/server db:studio"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

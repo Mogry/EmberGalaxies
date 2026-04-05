@@ -1,0 +1,251 @@
+import { BuildingType } from './types';
+
+export interface BuildingCost {
+  iron: number;
+  silver: number;
+  uderon?: number;
+  h2?: number;
+  energy?: number;
+}
+
+export type BuildingCosts = Record<number, BuildingCost>; // level -> cost (level N means upgrade from N-1 to N)
+
+export const BUILDING_COSTS: Record<BuildingType, BuildingCosts> = {
+  zentrale: {
+    1:  { iron: 23,   silver: 23,   uderon: 23 },
+    2:  { iron: 48,   silver: 36,   uderon: 31 },
+    3:  { iron: 126,  silver: 75,   uderon: 55 },
+    4:  { iron: 261,  silver: 144,  uderon: 97 },
+    5:  { iron: 461,  silver: 244,  uderon: 157 },
+    6:  { iron: 732,  silver: 380,  uderon: 239 },
+    7:  { iron: 1081, silver: 555,  uderon: 345 },
+    8:  { iron: 1516, silver: 773,  uderon: 476 },
+    9:  { iron: 2044, silver: 1038, uderon: 635 },
+    10: { iron: 2673, silver: 1353, uderon: 825 },
+    11: { iron: 3411, silver: 1723, uderon: 1047 },
+    12: { iron: 4268, silver: 2151, uderon: 1305 },
+    13: { iron: 5252, silver: 2644, uderon: 1601 },
+    14: { iron: 6372, silver: 3205, uderon: 1938 },
+    15: { iron: 7638, silver: 3839, uderon: 2319 },
+    16: { iron: 9061, silver: 4551, uderon: 2747 },
+    17: { iron: 10652, silver: 5347, uderon: 3225 },
+    18: { iron: 12420, silver: 6231, uderon: 3756 },
+    19: { iron: 14378, silver: 7211, uderon: 4344 },
+    20: { iron: 16537, silver: 8291, uderon: 4993 },
+    21: { iron: 18909, silver: 9478, uderon: 5706 },
+  },
+
+  iron_mine: {
+    1:  { iron: 4,    silver: 17 },
+    2:  { iron: 18,   silver: 33 },
+    3:  { iron: 63,   silver: 82 },
+    4:  { iron: 141,  silver: 168 },
+    5:  { iron: 257,  silver: 296 },
+    6:  { iron: 415,  silver: 468 },
+    7:  { iron: 618,  silver: 691 },
+    8:  { iron: 870,  silver: 968 },
+    9:  { iron: 1177, silver: 1304 },
+    10: { iron: 1542, silver: 1704 },
+    11: { iron: 1990, silver: 2195 },
+    12: { iron: 2493, silver: 2746 },
+    13: { iron: 3071, silver: 3378 },
+    14: { iron: 3728, silver: 4098 },
+    15: { iron: 4473, silver: 4912 },
+    16: { iron: 5308, silver: 5827 },
+    17: { iron: 6242, silver: 6849 },
+    18: { iron: 7281, silver: 7987 },
+    19: { iron: 8431, silver: 9245 },
+    20: { iron: 9699, silver: 10633 },
+    21: { iron: 11202, silver: 12278 },
+  },
+
+  silver_mine: {
+    1:  { iron: 4,    silver: 11 },
+    2:  { iron: 21,   silver: 26 },
+    3:  { iron: 72,   silver: 75 },
+    4:  { iron: 163,  silver: 161 },
+    5:  { iron: 297,  silver: 288 },
+    6:  { iron: 479,  silver: 461 },
+    7:  { iron: 713,  silver: 683 },
+    8:  { iron: 1005, silver: 959 },
+    9:  { iron: 1360, silver: 1295 },
+    10: { iron: 1782, silver: 1695 },
+    11: { iron: 2300, silver: 2186 },
+    12: { iron: 2882, silver: 2737 },
+    13: { iron: 3550, silver: 3368 },
+    14: { iron: 4310, silver: 4088 },
+    15: { iron: 5170, silver: 4902 },
+    16: { iron: 6136, silver: 5816 },
+    17: { iron: 7216, silver: 6838 },
+    18: { iron: 8417, silver: 7974 },
+    19: { iron: 9747, silver: 9233 },
+    20: { iron: 11213, silver: 10620 },
+    21: { iron: 12951, silver: 12265 },
+  },
+
+  h2_refinery: {
+    1:  { iron: 10,  silver: 5 },
+    2:  { iron: 20,  silver: 23 },
+    3:  { iron: 51,  silver: 80 },
+    4:  { iron: 105, silver: 181 },
+    5:  { iron: 185, silver: 329 },
+    6:  { iron: 293, silver: 531 },
+    7:  { iron: 433, silver: 791 },
+    8:  { iron: 607, silver: 1114 },
+    9:  { iron: 818, silver: 1507 },
+    10: { iron: 1070, silver: 1975 },
+    11: { iron: 1378, silver: 2550 },
+    12: { iron: 1725, silver: 3194 },
+    13: { iron: 2122, silver: 3934 },
+    14: { iron: 2574, silver: 4777 },
+    15: { iron: 3086, silver: 5730 },
+    16: { iron: 3661, silver: 6801 },
+    17: { iron: 4303, silver: 7998 },
+    18: { iron: 5018, silver: 9328 },
+    19: { iron: 5809, silver: 10801 },
+    20: { iron: 6682, silver: 12426 },
+    21: { iron: 7716, silver: 14352 },
+  },
+
+  fusion_plant: {
+    1:  { iron: 42,  silver: 19, uderon: 19, h2: 16 },
+    2:  { iron: 77,  silver: 44, uderon: 40, h2: 32 },
+    3:  { iron: 183, silver: 121, uderon: 103, h2: 81 },
+    4:  { iron: 368, silver: 256, uderon: 214, h2: 167 },
+    5:  { iron: 641, silver: 456, uderon: 377, h2: 294 },
+    6:  { iron: 1011, silver: 727, uderon: 599, h2: 467 },
+    7:  { iron: 1488, silver: 1076, uderon: 885, h2: 689 },
+    8:  { iron: 2081, silver: 1511, uderon: 1241, h2: 966 },
+    9:  { iron: 2802, silver: 2038, uderon: 1672, h2: 1302 },
+    10: { iron: 3660, silver: 2667, uderon: 2187, h2: 1702 },
+    11: { iron: 4667, silver: 3405, uderon: 2791, h2: 2172 },
+    12: { iron: 5836, silver: 4262, uderon: 3492, h2: 2717 },
+    13: { iron: 7178, silver: 5245, uderon: 4297, h2: 3343 },
+    14: { iron: 8706, silver: 6365, uderon: 5213, h2: 4056 },
+    15: { iron: 10434, silver: 7631, uderon: 6250, h2: 4862 },
+    16: { iron: 12375, silver: 9054, uderon: 7414, h2: 5768 },
+    17: { iron: 14544, silver: 10644, uderon: 8715, h2: 6780 },
+    18: { iron: 16956, silver: 12412, uderon: 10162, h2: 7905 },
+    19: { iron: 19626, silver: 14370, uderon: 11764, h2: 9151 },
+    20: { iron: 22571, silver: 16529, uderon: 13530, h2: 10525 },
+    21: { iron: 25807, silver: 18901, uderon: 15471, h2: 12035 },
+  },
+
+  shipyard: {
+    1:  { iron: 3000,  silver: 3750,  uderon: 1125, h2: 1125, energy: 1125 },
+    2:  { iron: 3800,  silver: 4560,  uderon: 1900, h2: 3420, energy: 3800 },
+    3:  { iron: 6160,  silver: 6930,  uderon: 4235, h2: 10395, energy: 11935 },
+    4:  { iron: 10140, silver: 10920, uderon: 8190, h2: 22230, energy: 25740 },
+    5:  { iron: 15800, silver: 16590, uderon: 13825, h2: 39105, energy: 45425 },
+    6:  { iron: 23200, silver: 24000, uderon: 21200, h2: 61200, energy: 71200 },
+    7:  { iron: 32400, silver: 33210, uderon: 30375, h2: 88695, energy: 103275 },
+    8:  { iron: 43460, silver: 44280, uderon: 41410, h2: 121770, energy: 141860 },
+    9:  { iron: 56440, silver: 57270, uderon: 54365, h2: 160605, energy: 187165 },
+    10: { iron: 71400, silver: 72240, uderon: 69300, h2: 205380, energy: 239400 },
+    11: { iron: 88400, silver: 89250, uderon: 86275, h2: 256275, energy: 298775 },
+    12: { iron: 107500, silver: 108360, uderon: 105350, h2: 313470, energy: 365500 },
+    13: { iron: 128760, silver: 129630, uderon: 126585, h2: 377145, energy: 439785 },
+    14: { iron: 152240, silver: 153120, uderon: 150040, h2: 447480, energy: 521840 },
+    15: { iron: 178000, silver: 178890, uderon: 175775, h2: 524655, energy: 611875 },
+    16: { iron: 206100, silver: 207000, uderon: 203850, h2: 608850, energy: 710100 },
+    17: { iron: 236600, silver: 237510, uderon: 234325, h2: 700245, energy: 816725 },
+    18: { iron: 269560, silver: 270480, uderon: 267260, h2: 799020, energy: 931960 },
+    19: { iron: 305040, silver: 305970, uderon: 302715, h2: 905355, energy: 1056015 },
+    20: { iron: 343100, silver: 344040, uderon: 340750, h2: 1019430, energy: 1189100 },
+    21: { iron: 383800, silver: 384750, uderon: 381425, h2: 1141425, energy: 1331425 },
+  },
+
+  planetary_shield: {
+    1:  { iron: 7300,  silver: 6500,  uderon: 7400, h2: 4566, energy: 4356 },
+    2:  { iron: 8080,  silver: 7480,  uderon: 8070, h2: 4866, energy: 5006 },
+    3:  { iron: 10420, silver: 10420, uderon: 10080, h2: 5766, energy: 6956 },
+    4:  { iron: 14320, silver: 15320, uderon: 13430, h2: 7266, energy: 10206 },
+    5:  { iron: 19780, silver: 22180, uderon: 18120, h2: 9366, energy: 14756 },
+    6:  { iron: 26800, silver: 31000, uderon: 24150, h2: 12066, energy: 20606 },
+    7:  { iron: 35380, silver: 41780, uderon: 31520, h2: 15366, energy: 27756 },
+    8:  { iron: 45520, silver: 54520, uderon: 40230, h2: 19266, energy: 36206 },
+    9:  { iron: 57220, silver: 69220, uderon: 50280, h2: 23766, energy: 45956 },
+    10: { iron: 70480, silver: 85880, uderon: 61670, h2: 28866, energy: 57006 },
+    11: { iron: 85300, silver: 104500, uderon: 74400, h2: 34566, energy: 69356 },
+    12: { iron: 101680, silver: 125080, uderon: 88470, h2: 40866, energy: 83006 },
+    13: { iron: 119620, silver: 147620, uderon: 103880, h2: 47766, energy: 97956 },
+    14: { iron: 139120, silver: 172120, uderon: 120630, h2: 55266, energy: 114206 },
+    15: { iron: 160180, silver: 198580, uderon: 138720, h2: 63366, energy: 131756 },
+    16: { iron: 182800, silver: 227000, uderon: 158150, h2: 72066, energy: 150606 },
+    17: { iron: 206980, silver: 257380, uderon: 178920, h2: 81366, energy: 170756 },
+    18: { iron: 232720, silver: 289720, uderon: 201030, h2: 91266, energy: 192206 },
+    19: { iron: 260020, silver: 324020, uderon: 224480, h2: 101766, energy: 214956 },
+    20: { iron: 288880, silver: 360280, uderon: 249270, h2: 112866, energy: 239006 },
+    21: { iron: 319300, silver: 398500, uderon: 275400, h2: 124566, energy: 264356 },
+  },
+
+  anti_spy: {
+    1:  { iron: 6500,  silver: 4000,  uderon: 5000, h2: 1800, energy: 1500 },
+    2:  { iron: 7300,  silver: 4750,  uderon: 5550, h2: 1900, energy: 1900 },
+    3:  { iron: 9700,  silver: 7000,  uderon: 7200, h2: 2200, energy: 3100 },
+    4:  { iron: 13700, silver: 10750, uderon: 9950, h2: 2700, energy: 5100 },
+    5:  { iron: 19300, silver: 16000, uderon: 13800, h2: 3400, energy: 7900 },
+    6:  { iron: 26500, silver: 22750, uderon: 18750, h2: 4300, energy: 11500 },
+    7:  { iron: 35300, silver: 31000, uderon: 24800, h2: 5400, energy: 15900 },
+    8:  { iron: 45700, silver: 40750, uderon: 31950, h2: 6700, energy: 21100 },
+    9:  { iron: 57700, silver: 52000, uderon: 40200, h2: 8200, energy: 27100 },
+    10: { iron: 71300, silver: 64750, uderon: 49550, h2: 9900, energy: 33900 },
+    11: { iron: 86500, silver: 79000, uderon: 60000, h2: 11800, energy: 41500 },
+    12: { iron: 103300, silver: 94750, uderon: 71550, h2: 13900, energy: 49900 },
+    13: { iron: 121700, silver: 112000, uderon: 84200, h2: 16200, energy: 59100 },
+    14: { iron: 141700, silver: 130750, uderon: 97950, h2: 18700, energy: 69100 },
+    15: { iron: 163300, silver: 151000, uderon: 112800, h2: 21400, energy: 79900 },
+    16: { iron: 186500, silver: 172750, uderon: 128750, h2: 24300, energy: 91500 },
+    17: { iron: 211300, silver: 196000, uderon: 145800, h2: 27400, energy: 103900 },
+    18: { iron: 237700, silver: 220750, uderon: 163950, h2: 30700, energy: 117100 },
+    19: { iron: 265700, silver: 247000, uderon: 183200, h2: 34200, energy: 131100 },
+    20: { iron: 295300, silver: 274750, uderon: 203550, h2: 37900, energy: 145900 },
+    21: { iron: 326500, silver: 304000, uderon: 225000, h2: 41800, energy: 161500 },
+  },
+
+  research_center: {
+    1:  { iron: 63,   silver: 32,  uderon: 21,  energy: 42 },
+    2:  { iron: 83,   silver: 41,  uderon: 26,  energy: 66 },
+    3:  { iron: 142,  silver: 67,  uderon: 41,  energy: 137 },
+    4:  { iron: 242,  silver: 112, uderon: 66,  energy: 261 },
+    5:  { iron: 390,  silver: 179, uderon: 104, energy: 444 },
+    6:  { iron: 589,  silver: 269, uderon: 154, energy: 691 },
+    7:  { iron: 845,  silver: 384, uderon: 218, energy: 1010 },
+    8:  { iron: 1163, silver: 528, uderon: 298, energy: 1406 },
+    9:  { iron: 1550, silver: 702, uderon: 395, energy: 1887 },
+    10: { iron: 2009, silver: 909, uderon: 510, energy: 2460 },
+    11: { iron: 2549, silver: 1151, uderon: 645, energy: 3132 },
+    12: { iron: 3174, silver: 1433, uderon: 801, energy: 3912 },
+    13: { iron: 3892, silver: 1756, uderon: 981, energy: 4807 },
+    14: { iron: 4709, silver: 2124, uderon: 1186, energy: 5827 },
+    15: { iron: 5633, silver: 2540, uderon: 1417, energy: 6979 },
+    16: { iron: 6670, silver: 3007, uderon: 1677, energy: 8274 },
+    17: { iron: 7830, silver: 3529, uderon: 1967, energy: 9721 },
+    18: { iron: 9118, silver: 4109, uderon: 2289, energy: 11330 },
+    19: { iron: 10545, silver: 4751, uderon: 2646, energy: 13111 },
+    20: { iron: 12118, silver: 5459, uderon: 3040, energy: 15075 },
+    21: { iron: 13847, silver: 6237, uderon: 3472, energy: 17233 },
+  },
+
+  // Uderon Raffinery - keine Kosten definiert, vorerst überspringen
+  uderon_raffinery: {},
+
+  // Raumstation - keine Kosten definiert, vorerst überspringen
+  space_station: {},
+
+  // Dummy building - keine Kosten
+  dummy_building: {},
+};
+
+// Get cost for upgrading a building from currentLevel to currentLevel + 1
+export function getBuildingUpgradeCost(
+  buildingType: BuildingType,
+  currentLevel: number
+): BuildingCost | null {
+  const costs = BUILDING_COSTS[buildingType];
+  if (!costs) return null;
+  // level N in costs means upgrading to level N (from N-1)
+  // so if currentLevel is 5, we need cost for level 6
+  const targetLevel = currentLevel + 1;
+  return costs[targetLevel] || null;
+}

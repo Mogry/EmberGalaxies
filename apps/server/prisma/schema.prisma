@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Galaxy {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  systems   System[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model System {
+  id        String   @id @default(cuid())
+  index     Int
+  galaxyId  String
+  galaxy    Galaxy   @relation(fields: [galaxyId], references: [id])
+  planets   Planet[]
+  star      Star?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([galaxyId, index])
+}
+
+model Star {
+  id           String   @id @default(cuid())
+  temperature  Int      // Kelvin
+  energyOutput Float    // kW
+  systemId     String   @unique
+  system       System   @relation(fields: [systemId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Planet {
+  id          String    @id @default(cuid())
+  name        String
+  slot        Int
+  systemId    String
+  system      System    @relation(fields: [systemId], references: [id])
+  ownerId     String?
+  owner       Player?   @relation(fields: [ownerId], references: [id])
+  iron        Float     @default(500)
+  silver      Float     @default(250)
+  ember       Float     @default(0)
+  h2          Float     @default(0)
+  energy      Float     @default(0)
+  lastSeen    DateTime  @default(now()) // Last time player viewed this planet (for offline production)
+  fieldsUsed  Int       @default(0)
+  fieldsMax   Int       @default(163)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  buildings   Building[]
+  shipyards   Shipyard[]
+  originFleets Fleet[]  @relation("OriginPlanet")
+  targetFleets Fleet[]  @relation("TargetPlanet")
+
+  @@unique([systemId, slot])
+}
+
+model Player {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  isBot     Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  planets   Planet[]
+  fleets    Fleet[]
+  research  Research[]
+}
+
+model Building {
+  id              String        @id @default(cuid())
+  planetId        String
+  planet          Planet        @relation(fields: [planetId], references: [id])
+  type            BuildingType
+  level           Int           @default(0)
+  isUpgrading     Boolean       @default(false)
+  upgradeFinishAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([planetId, type])
+}
+
+model Fleet {
+  id              String        @id @default(cuid())
+  ownerId         String
+  owner           Player        @relation(fields: [ownerId], references: [id])
+  originPlanetId  String
+  originPlanet    Planet        @relation("OriginPlanet", fields: [originPlanetId], references: [id])
+  targetPlanetId  String?
+  targetPlanet    Planet?       @relation("TargetPlanet", fields: [targetPlanetId], references: [id])
+  mission         FleetMission
+  iron            Float         @default(0)
+  silver          Float         @default(0)
+  ember           Float         @default(0)
+  h2              Float         @default(0)
+  energy          Float         @default(0)
+  launchedAt      DateTime      @default(now())
+  arrivesAt       DateTime
+  returnsAt       DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  ships           FleetShip[]
+}
+
+model FleetShip {
+  id       String  @id @default(cuid())
+  fleetId  String
+  fleet    Fleet   @relation(fields: [fleetId], references: [id], onDelete: Cascade)
+  type     ShipType
+  count    Int
+}
+
+model Research {
+  id               String       @id @default(cuid())
+  playerId         String
+  player           Player       @relation(fields: [playerId], references: [id])
+  type             ResearchType
+  level            Int          @default(0)
+  isResearching    Boolean      @default(false)
+  researchFinishAt DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([playerId, type])
+}
+
+model Shipyard {
+  id            String    @id @default(cuid())
+  planetId      String
+  planet        Planet    @relation(fields: [planetId], references: [id])
+  shipType      ShipType
+  count         Int       @default(1)
+  isBuilding    Boolean   @default(false)
+  buildFinishAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([planetId, shipType])
+}
+
+enum BuildingType {
+  zentrale
+  iron_mine        // Eisenmine
+  silver_mine      // Silbermine
+  uderon_raffinery // Uderon-Raffinerie
+  h2_refinery      // Wasserstoff-Raffinerie
+  fusion_plant     // Fusionskraftwerk
+  research_center  // Forschungszentrum
+  shipyard          // Werft
+  space_station     // Raumstation
+  anti_spy          // Anti-Spionage-Schild
+  planetary_shield  // Planetarer Schildfeldgenerator
+  dummy_building    // Dummy-Bau (für Fastbuild)
+}
+
+enum ShipType {
+  light_fighter
+  heavy_fighter
+  cruiser
+  battleship
+  colony_ship
+  recycler
+  espionage_probe
+  bomber
+  destroyer
+  deathstar
+  battlecruiser
+  small_cargo
+  large_cargo
+}
+
+enum FleetMission {
+  attack
+  transport
+  deployment
+  colonize
+  harvest
+  espionage
+}
+
+enum ResearchType {
+  iron_mining      // Eisenförderung +5% per level
+  silver_mining    // Silberförderung +5% per level
+  ember_extraction // Ember-Extraktion +5% per level
+  h2_refining      // H2-Raffinierung +5% per level
+  energy_efficiency // Energie-Effizienz +5% per level
+  laser_technology
+  ion_technology
+  hyperspace_technology
+  plasma_technology
+  combustion_drive
+  impulse_drive
+  hyperspace_drive
+  espionage_technology
+  computer_technology
+  astrophysics
+  intergalactic_research_network
+  graviton_technology
+  shield_technology
+  armour_technology
+  weapons_technology
+}

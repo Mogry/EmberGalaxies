@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-family-mono: "Press Start 2P", "VT323", "Courier New", Courier, monospace;
+
+  --color-amber-100: #ffb000;
+  --color-amber-200: #ff9900;
+  --color-amber-300: #ff8800;
+  --color-amber-400: #ff7700;
+  --color-amber-500: #ff6600;
+  --color-amber-glow: #ff7700;
+
+  --color-terminal-bg: #0a0a0a;
+  --color-terminal-bg-alt: #0f0f0f;
+  --color-terminal-fg: #ffb000;
+  --color-terminal-dim: #cc8800;
+
+  --color-ember-50: #fff7ed;
+  --color-ember-100: #ffedd5;
+  --color-ember-200: #fed7aa;
+  --color-ember-300: #fdba74;
+  --color-ember-400: #fb923c;
+  --color-ember-500: #f97316;
+  --color-ember-600: #ea580c;
+  --color-ember-700: #c2410c;
+  --color-ember-800: #9a3412;
+  --color-ember-900: #7c2d12;
+
+  --color-galaxy-dark: #0a0a1a;
+  --color-galaxy-darker: #050510;
+  --color-galaxy-purple: #1a1a3a;
+  --color-galaxy-blue: #0d1b2a;
+
+  --color-stars: radial-gradient(circle at center, #1a1a3a 0%, #050510 100%);
+  --color-terminal-grid: linear-gradient(rgba(255, 119, 0, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 119, 0, 0.03) 1px, transparent 1px);
+}
+
+body {
+  margin: 0;
+  font-family: 'VT323', monospace;
+  background-color: #0a0a0a;
+  color: #ffb000;
+  font-size: 18px;
+}

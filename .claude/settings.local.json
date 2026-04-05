@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/tobi/EmberGalaxies/ember-galaxies-docs)",
+      "Bash(unzip -o /Users/tobi/Downloads/Ember_Galaxies_Projekt.zip -d /Users/tobi/EmberGalaxies/ember-galaxies-docs)",
+      "Bash(lsof -ti:5173)",
+      "Bash(xargs kill:*)",
+      "Bash(bun run:*)",
+      "Bash(pkill -f \"bun run dev\")",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(pkill -9 -f \"bun.*dev\")",
+      "Bash(lsof -ti:3000)",
+      "Bash(lsof -ti:5174)",
+      "Bash(lsof -ti:5175)",
+      "Bash(pkill -9 -f bun)",
+      "Bash(lsof -ti:3000 -o -tcp:3000)",
+      "Bash(lsof -ti:5173 -o -tcp:5173)",
+      "Bash(pkill -9 bun)",
+      "Bash(pkill -9 -f \"bun.*web\")",
+      "Bash(kill %1)",
+      "Bash(wait)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(lsof -ti:5173,5174,5175,5176,5177,5178,5179)",
+      "Bash(cp src/index.css src/index.css.bak)",
+      "Bash(mv postcss.config.js postcss.config.js.bak)",
+      "Bash(bun remove:*)",
+      "Bash(bun add:*)",
+      "Bash(pkill -f \"bun\")",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(bunx prisma:*)",
+      "Bash(curl:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('star:', d['system'].get\\('star'\\)\\)\")",
+      "Bash(xxd \"/Users/tobi/EmberGalaxies/ember-galaxies-docs/baukosten.md\")",
+      "Bash(bun build:*)",
+      "Bash(bun tsc:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

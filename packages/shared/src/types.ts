@@ -26,6 +26,12 @@ export interface System {
   star?: Star;
 }
 
+export interface PlanetShip {
+  planetId: string;
+  shipType: ShipType;
+  count: number;
+}
+
 export interface Planet {
   id: string;
   name: string;
@@ -44,6 +50,7 @@ export interface Planet {
   updatedAt: Date;
   system?: System;
   buildings?: Building[];
+  planetShips?: PlanetShip[];
 }
 
 export interface Player {

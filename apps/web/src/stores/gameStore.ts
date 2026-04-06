@@ -17,6 +17,7 @@ interface GameState {
   setView: (view: 'galaxy' | 'planet' | 'planets' | 'fleet' | 'research' | 'shipyard') => void;
   updateResources: (planetId: string, resources: { iron?: number; silver?: number; ember?: number; h2?: number; energy?: number }) => void;
   updatePlanet: (planet: Planet) => void;
+  refreshSelectedPlanet: (planetId: string) => Promise<void>;
 }
 
 export const useGameStore = create<GameState>((set) => ({
@@ -34,7 +35,6 @@ export const useGameStore = create<GameState>((set) => ({
   setSelectedPlanet: (planet) =>
     set((state) => ({
       selectedPlanet: planet,
-      // Also update the planet in the planets array
       planets: planet
         ? state.planets.map((p) => (p.id === planet.id ? planet : p))
         : state.planets,
@@ -51,4 +51,14 @@ export const useGameStore = create<GameState>((set) => ({
       planets: state.planets.map((p) => (p.id === planet.id ? planet : p)),
       selectedPlanet: state.selectedPlanet?.id === planet.id ? planet : state.selectedPlanet,
     })),
+  refreshSelectedPlanet: async (planetId: string) => {
+    const res = await fetch(`/api/game/planet/${planetId}`);
+    if (res.ok) {
+      const updated = await res.json();
+      set((state) => ({
+        planets: state.planets.map((p) => (p.id === planetId ? updated : p)),
+        selectedPlanet: state.selectedPlanet?.id === planetId ? updated : state.selectedPlanet,
+      }));
+    }
+  },
 }));

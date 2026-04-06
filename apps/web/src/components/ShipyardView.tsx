@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Planet } from '@ember-galaxies/shared';
 import { GameTimer } from './GameTimer';
+import { useGameStore } from '../stores/gameStore';
 
 interface ShipyardViewProps {
   planet: Planet;
@@ -40,6 +41,7 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
   const [selectedShip, setSelectedShip] = useState<string | null>(null);
   const [count, setCount] = useState(1);
   const [loading, setLoading] = useState(false);
+  const refreshSelectedPlanet = useGameStore(s => s.refreshSelectedPlanet);
 
   const refreshShipyards = async () => {
     try {
@@ -67,6 +69,7 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
         body: JSON.stringify({ planetId: planet.id, shipType, count }),
       });
       if (res.ok) {
+        await refreshSelectedPlanet(planet.id);
         await refreshShipyards();
         setSelectedShip(null);
         setCount(1);
@@ -86,6 +89,7 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
         body: JSON.stringify({ planetId: planet.id, shipType }),
       });
       if (res.ok) {
+        await refreshSelectedPlanet(planet.id);
         await refreshShipyards();
       }
     } catch (error) {

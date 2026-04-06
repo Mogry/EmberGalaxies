@@ -3,22 +3,7 @@ import { useGameStore } from '../stores/gameStore';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
-  const { player, setPlanets, setFleets, setSelectedPlanet, updateResources } = useGameStore();
-
-  const fetchGameState = useCallback(async () => {
-    if (!player) return;
-    try {
-      const res = await fetch(`/api/game/state/${player.id}`);
-      if (res.ok) {
-        const state = await res.json();
-        setPlanets(state.planets);
-        setFleets(state.fleets);
-        setSelectedPlanet(state.planets[0] || null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch game state:', error);
-    }
-  }, [player?.id, setPlanets, setFleets, setSelectedPlanet]);
+  const { player, setPlanets, setFleets, setSelectedPlanet, updateResources, refreshPlanet } = useGameStore();
 
   const fetchFleets = useCallback(async () => {
     if (!player) return;
@@ -51,7 +36,6 @@ export function useWebSocket() {
 
         switch (data.type) {
           case 'resource_update':
-            // Handle resource updates for each planet
             if (data.data?.planets) {
               for (const planetData of data.data.planets) {
                 updateResources(planetData.id, {
@@ -64,15 +48,25 @@ export function useWebSocket() {
               }
             }
             break;
+
           case 'fleet_arrival':
           case 'fleet_return':
             fetchFleets();
             break;
-          case 'building_complete':
-          case 'ship_complete':
+
+          // Only refresh the SINGLE planet that changed — no navigation disruption
+          case 'building_complete': {
+            const planetId = data.data?.planetId;
+            if (planetId) refreshPlanet(planetId);
+            break;
+          }
+          case 'ship_complete': {
+            const planetId = data.data?.planetId;
+            if (planetId) refreshPlanet(planetId);
+            break;
+          }
           case 'research_complete':
-            // Refresh full game state when something completes
-            fetchGameState();
+            // Research doesn't affect current view — just let it update in background
             break;
         }
       } catch (e) {
@@ -91,7 +85,7 @@ export function useWebSocket() {
     return () => {
       ws.close();
     };
-  }, [player?.id, fetchGameState, fetchFleets, updateResources]);
+  }, [player?.id, fetchFleets, updateResources, refreshPlanet, setFleets]);
 
   return wsRef.current;
 }

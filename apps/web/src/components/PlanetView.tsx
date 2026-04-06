@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Planet, BuildingType, Building } from '@ember-galaxies/shared';
 import { calculateProduction, BUILDING_PRODUCTION, getBuildingUpgradeCost } from '@ember-galaxies/shared';
-import { useGameStore } from '../stores/gameStore';
+import { useGameSync } from '../hooks/useGameSync';
 import { GameTimer } from './GameTimer';
 import { BuildingDetailModal } from './BuildingDetailModal';
 
@@ -61,7 +61,7 @@ function getBuildingState(building: Building | undefined) {
 }
 
 export function PlanetView({ planet }: PlanetViewProps) {
-  const { updatePlanet, planets, setSelectedPlanet } = useGameStore();
+  const { mutateAndRefresh, selectPlanet, refreshPlanet, planets } = useGameSync();
 
   const myPlanets = planets
     .filter((p) => p.ownerId === planet.ownerId)
@@ -75,80 +75,58 @@ export function PlanetView({ planet }: PlanetViewProps) {
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < myPlanets.length - 1;
 
-  const goToPrevPlanet = async () => {
+  const goToPrevPlanet = () => {
     if (!hasPrev) return;
-    const prevPlanet = myPlanets[currentIndex - 1];
-    const res = await fetch(`/api/game/planet/${prevPlanet.id}`);
-    if (res.ok) {
-      const fullPlanet = await res.json();
-      setSelectedPlanet(fullPlanet);
-    }
+    selectPlanet(myPlanets[currentIndex - 1].id);
   };
 
-  const goToNextPlanet = async () => {
+  const goToNextPlanet = () => {
     if (!hasNext) return;
-    const nextPlanet = myPlanets[currentIndex + 1];
-    const res = await fetch(`/api/game/planet/${nextPlanet.id}`);
-    if (res.ok) {
-      const fullPlanet = await res.json();
-      setSelectedPlanet(fullPlanet);
-    }
+    selectPlanet(myPlanets[currentIndex + 1].id);
   };
 
   const [buildingAction, setBuildingAction] = useState<string | null>(null);
   const [selectedBuildingType, setSelectedBuildingType] = useState<BuildingType | null>(null);
 
-  const handleBuild = async (buildingType: BuildingType) => {
+  const handleBuild = (buildingType: BuildingType) => {
     if (buildingAction) return;
     setBuildingAction(buildingType);
-    try {
+    mutateAndRefresh(planet.id, async () => {
       const res = await fetch('/api/building/construct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planetId: planet.id, buildingType }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        updatePlanet(updated);
-      }
-    } finally {
-      setBuildingAction(null);
-    }
+      if (!res.ok) console.error('Build failed:', await res.text());
+    }).finally(() => setBuildingAction(null));
   };
 
-  const handleUpgrade = async (buildingType: BuildingType) => {
+  const handleUpgrade = (buildingType: BuildingType) => {
     if (buildingAction) return;
     setBuildingAction(buildingType);
-    try {
+    mutateAndRefresh(planet.id, async () => {
       const res = await fetch('/api/building/upgrade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planetId: planet.id, buildingType }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        updatePlanet(updated);
-      }
-    } finally {
-      setBuildingAction(null);
-    }
+      if (!res.ok) console.error('Upgrade failed:', await res.text());
+    }).finally(() => setBuildingAction(null));
   };
 
-  const handleCancelUpgrade = async (buildingType: BuildingType) => {
-    const res = await fetch('/api/building/cancel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planetId: planet.id, buildingType }),
+  const handleCancelUpgrade = (buildingType: BuildingType) => {
+    mutateAndRefresh(planet.id, async () => {
+      const res = await fetch('/api/building/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planetId: planet.id, buildingType }),
+      });
+      if (!res.ok) console.error('Cancel failed:', await res.text());
     });
-    if (res.ok) {
-      const updated = await res.json();
-      updatePlanet(updated);
-    }
   };
 
-  const handleTimerComplete = async () => {
-    const updated = await fetch(`/api/game/planet/${planet.id}`).then((r) => r.json());
-    updatePlanet(updated);
+  const handleTimerComplete = () => {
+    refreshPlanet(planet.id);
   };
 
   const getBuilding = (type: BuildingType): Building | undefined => {

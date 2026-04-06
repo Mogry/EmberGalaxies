@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../stores/gameStore';
+import { useGameSync } from '../hooks/useGameSync';
 import type { Planet, System, Galaxy } from '@ember-galaxies/shared';
 
 interface SystemResponse {
@@ -10,6 +11,7 @@ interface SystemResponse {
 
 export function GalaxyView() {
   const { setSelectedPlanet, setView, setPlanets, planets: myPlanets } = useGameStore();
+  const { selectPlanet } = useGameSync();
   const [galaxyIndex, setGalaxyIndex] = useState(1);
   const [systemIndex, setSystemIndex] = useState(1);
   const [systemData, setSystemData] = useState<SystemResponse | null>(null);
@@ -60,15 +62,10 @@ export function GalaxyView() {
     loadSystem();
   }, [systemIndex, galaxyIndex]);
 
-  const handlePlanetClick = async (planet: Planet) => {
-    // Don't navigate if clicking the colonize button
+  const handlePlanetClick = (planet: Planet) => {
     if (planet.ownerId) {
-      const res = await fetch(`/api/game/planet/${planet.id}`);
-      if (res.ok) {
-        const fullPlanet = await res.json();
-        setSelectedPlanet(fullPlanet);
-        setView('planet');
-      }
+      selectPlanet(planet.id);
+      setView('planet');
     }
   };
 
@@ -79,9 +76,10 @@ export function GalaxyView() {
     const res = await fetch(`/api/game/planet/${planet.id}/colonize`, { method: 'POST' });
     if (res.ok) {
       const colonized = await res.json();
-      // Add to local planets list
+      // Add to store's planets list AND set as selectedPlanet explicitly
       setPlanets([...myPlanets, colonized]);
-      // Refresh system data
+      setSelectedPlanet(colonized);
+      setView('planet');
       loadSystem();
     }
   };

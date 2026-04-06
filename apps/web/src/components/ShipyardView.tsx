@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Planet } from '@ember-galaxies/shared';
 import { GameTimer } from './GameTimer';
-import { useGameStore } from '../stores/gameStore';
+import { useGameSync } from '../hooks/useGameSync';
 
 interface ShipyardViewProps {
   planet: Planet;
@@ -41,7 +41,7 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
   const [selectedShip, setSelectedShip] = useState<string | null>(null);
   const [count, setCount] = useState(1);
   const [loading, setLoading] = useState(false);
-  const refreshSelectedPlanet = useGameStore(s => s.refreshSelectedPlanet);
+  const { mutateAndRefresh, refreshPlanet } = useGameSync();
 
   const refreshShipyards = async () => {
     try {
@@ -63,42 +63,36 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
   const handleBuild = async (shipType: string) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/shipyard/build', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planetId: planet.id, shipType, count }),
+      await mutateAndRefresh(planet.id, async () => {
+        const res = await fetch('/api/shipyard/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planetId: planet.id, shipType, count }),
+        });
+        if (!res.ok) console.error('Build failed:', await res.text());
       });
-      if (res.ok) {
-        await refreshSelectedPlanet(planet.id);
-        await refreshShipyards();
-        setSelectedShip(null);
-        setCount(1);
-      }
-    } catch (error) {
-      console.error('Failed to build ship:', error);
+      await refreshShipyards();
     } finally {
       setLoading(false);
+      setSelectedShip(null);
+      setCount(1);
     }
   };
 
   const handleCancel = async (shipType: string) => {
-    try {
+    await mutateAndRefresh(planet.id, async () => {
       const res = await fetch('/api/shipyard/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planetId: planet.id, shipType }),
       });
-      if (res.ok) {
-        await refreshSelectedPlanet(planet.id);
-        await refreshShipyards();
-      }
-    } catch (error) {
-      console.error('Failed to cancel ship build:', error);
-    }
+      if (!res.ok) console.error('Cancel failed:', await res.text());
+    });
+    await refreshShipyards();
   };
 
   const handleTimerComplete = () => {
-    refreshShipyards();
+    refreshPlanet(planet.id).then(refreshShipyards);
   };
 
   const hasShipyard = planet.buildings?.some(b => b.type === 'shipyard' && b.level > 0);

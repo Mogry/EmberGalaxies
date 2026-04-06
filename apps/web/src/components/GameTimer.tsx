@@ -47,7 +47,7 @@ export function GameTimer({ finishAt, onComplete, className = '', compact = fals
   if (!finishAt || timeLeft === 0) {
     return (
       <span className={`text-green-400 ${className}`}>
-        Fertig!
+        Done!
       </span>
     );
   }

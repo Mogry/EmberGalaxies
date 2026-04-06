@@ -339,7 +339,7 @@ gameRoutes.post('/planet/:planetId/colonize', async (c) => {
     where: { id: planetId },
     data: {
       ownerId: player.id,
-      name: `${player.name}'s Kolonie`,
+      name: `${player.name}'s Colony`,
       iron: 500,
       silver: 250,
       ember: 0,

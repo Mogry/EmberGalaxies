@@ -2,9 +2,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Planeten pro System: Normalverteilt, min 10, max 30, mean 20, stddev ~4
+// Planets per system: Normal distribution, min 10, max 30, mean 20, stddev ~4
 function planetCountForSystem(): number {
-  // Zentraler Grenzwertsatz: Summe von 6 Gleichverteilten → annähernd Normalverteilung
+  // Central Limit Theorem: sum of 6 uniform → approx normal distribution
   const samples = Array.from({ length: 6 }, () => Math.random());
   const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
   const gauss = (mean - 0.5) * 4; // transform to ~N(0, 1)
@@ -12,28 +12,28 @@ function planetCountForSystem(): number {
   return Math.max(10, Math.min(30, count));
 }
 
-// Stern-Temperatur basierend auf Planetenanzahl
+// Star temperature based on planet count
 function starTemperature(planetCount: number): number {
-  // 10 Planeten → 2500K, 30 Planeten → 4000K (linear)
+  // 10 planets → 2500K, 30 planets → 4000K (linear)
   return Math.round(2000 + planetCount * 70);
 }
 
-// Stern-Energieoutput basierend auf Temperatur
+// Star energy output based on temperature
 function starEnergyOutput(temperature: number): number {
-  // Basis: 3000K → 1000 kW
+  // Base: 3000K → 1000 kW
   return Math.round((temperature / 3000) * 1000 * 10) / 10;
 }
 
 async function main() {
   console.log('🌀 Starting galaxy initialization...\n');
 
-  // Existierende Daten löschen (sauberer Start)
+  // Delete existing data (clean start)
   await prisma.star.deleteMany();
   await prisma.planet.deleteMany();
   await prisma.system.deleteMany();
   await prisma.galaxy.deleteMany();
 
-  const galaxyNames = ['Milchstraße', 'Andromeda', 'Triangulum'];
+  const galaxyNames = ['Milky Way', 'Andromeda', 'Triangulum'];
   const SYSTEMS_PER_GALAXY = 300;
   const MIN_PLANETS = 10;
   const MAX_PLANETS = 30;
@@ -55,7 +55,7 @@ async function main() {
       const temperature = starTemperature(planetCount);
       const energyOutput = starEnergyOutput(temperature);
 
-      // System erstellen mit Star in einer Transaktion
+      // Create system with star in a transaction
       const system = await prisma.system.create({
         data: {
           index: s,
@@ -69,7 +69,7 @@ async function main() {
         },
       });
 
-      // Planeten erstellen
+      // Create planets
       const planetCreations = [];
       for (let p = 1; p <= planetCount; p++) {
         planetCreations.push({

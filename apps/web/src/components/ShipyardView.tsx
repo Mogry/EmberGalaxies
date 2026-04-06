@@ -15,19 +15,18 @@ interface ShipyardEntry {
 }
 
 const SHIP_INFO: Record<string, { name: string; icon: string; description: string }> = {
-  light_fighter: { name: 'Leichter Jäger', icon: '✈️', description: 'Schnell aber schwach' },
-  heavy_fighter: { name: 'Schwerer Jäger', icon: '🛩️', description: 'Mehr Feuerkraft' },
-  cruiser: { name: 'Kreuzer', icon: '🚢', description: 'Ausgewogene Kampfkraft' },
-  battleship: { name: 'Schlachtschiff', icon: '⚓', description: 'Schwerer Bruther' },
-  colony_ship: { name: 'Kolonisationsschiff', icon: '🚀', description: 'Gründet neue Kolonien' },
-  recycler: { name: 'Recyclerschiff', icon: '♻️', description: 'Sammelt Trümmer' },
-  espionage_probe: { name: 'Spionagesonde', icon: '🔭', description: 'Ausspähung' },
-  bomber: { name: 'Bomber', icon: '💣', description: 'Gegen stationäre Ziele' },
-  destroyer: { name: 'Zerstörer', icon: '⚔️', description: 'Spezialisiert auf Jäger' },
-  deathstar: { name: 'Todesstern', icon: '🌑', description: 'Ultimative Waffe' },
-  battlecruiser: { name: 'Schlachtkreuzer', icon: '🏴', description: 'Schnell und stark' },
-  small_cargo: { name: 'Kleiner Transporter', icon: '📦', description: 'Transportiert Ressourcen' },
-  large_cargo: { name: 'Großer Transporter', icon: '🗃️', description: 'Mehr Ladung' },
+  fly: { name: 'Fly', icon: '🪰', description: 'The first and cheapest combat ship' },
+  bumblebee: { name: 'Bumblebee', icon: '🐝', description: 'Small support/bomber fighter' },
+  corvette: { name: 'Corvette', icon: '🚤', description: 'First real combat unit' },
+  light_cruiser: { name: 'Light Cruiser', icon: '🚀', description: 'Long-range cruiser with jump drive' },
+  heavy_cruiser: { name: 'Heavy Cruiser', icon: '🛳️', description: 'Reinforced cruiser variant' },
+  battleship: { name: 'Battleship', icon: '⚓', description: 'Powerful warship with direct jump' },
+  battleship_nexus: { name: 'Battleship of Nexus Class', icon: '🔱', description: 'Penultimate flagship' },
+  battleship_phoenix: { name: 'Battleship of Phoenix Class', icon: '🔥', description: 'The ultimate ship' },
+  carrier_titan: { name: 'Carrier Titan', icon: '🛸', description: 'Mega fleet transport' },
+  colonizer: { name: 'Colonizer', icon: '🧬', description: 'Colonizes new planets' },
+  invasion_unit: { name: 'Invasion-Unit', icon: '⚔️', description: 'Takes over enemy planets' },
+  ember_bomb: { name: 'Ember Bomb', icon: '💣', description: 'Destroys enemy planets' },
 };
 
 export function ShipyardView({ planet }: ShipyardViewProps) {
@@ -96,8 +95,8 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
   if (!hasShipyard) {
     return (
       <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">🚢 Werft</h3>
-        <p className="text-gray-400">Du benötigst eine Werft um Schiffe zu bauen.</p>
+        <h3 className="text-lg font-semibold text-white mb-4">🚢 Shipyard</h3>
+        <p className="text-gray-400">You need a Shipyard to build ships.</p>
       </div>
     );
   }
@@ -108,13 +107,13 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
   return (
     <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple overflow-hidden">
       <div className="bg-galaxy-purple/30 px-4 py-2">
-        <h3 className="text-lg font-semibold text-white">🚢 Werft</h3>
+        <h3 className="text-lg font-semibold text-white">🚢 Shipyard</h3>
       </div>
 
       {/* Currently Building */}
       {buildingShips.length > 0 && (
         <div className="p-4 border-b border-galaxy-purple/30">
-          <h4 className="text-sm font-medium text-gray-400 mb-3">Im Bau</h4>
+          <h4 className="text-sm font-medium text-gray-400 mb-3">Building</h4>
           <div className="space-y-2">
             {buildingShips.map(ship => {
               const info = SHIP_INFO[ship.shipType] || { name: ship.shipType, icon: '🚀', description: '' };
@@ -139,7 +138,7 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
                       onClick={() => handleCancel(ship.shipType)}
                       className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
                     >
-                      Abbrechen
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -183,10 +182,10 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
           <div className="mt-4 p-4 bg-galaxy-darker rounded-lg border border-galaxy-purple">
             <div className="flex items-center space-x-2 mb-3">
               <span className="text-xl">{SHIP_INFO[selectedShip]?.icon}</span>
-              <span className="text-white font-medium">{SHIP_INFO[selectedShip]?.name} bauen</span>
+              <span className="text-white font-medium">{SHIP_INFO[selectedShip]?.name} Build</span>
             </div>
             <div className="flex items-center space-x-3">
-              <label className="text-gray-400 text-sm">Anzahl:</label>
+              <label className="text-gray-400 text-sm">Amount:</label>
               <input
                 type="number"
                 min={1}
@@ -202,13 +201,13 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
                 disabled={loading}
                 className="px-4 py-2 bg-ember-600 hover:bg-ember-500 text-white rounded transition-colors disabled:opacity-50"
               >
-                {loading ? 'Baue...' : 'Bauen'}
+                {loading ? 'Building...' : 'Build'}
               </button>
               <button
                 onClick={() => setSelectedShip(null)}
                 className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors"
               >
-                Abbrechen
+                Cancel
               </button>
             </div>
           </div>

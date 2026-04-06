@@ -149,33 +149,32 @@ model Shipyard {
 
 enum BuildingType {
   zentrale
-  iron_mine        // Eisenmine
-  silver_mine      // Silbermine
-  uderon_raffinery // Uderon-Raffinerie
-  h2_refinery      // Wasserstoff-Raffinerie
-  fusion_plant     // Fusionskraftwerk
-  research_center  // Forschungszentrum
-  shipyard          // Werft
-  space_station     // Raumstation
-  anti_spy          // Anti-Spionage-Schild
-  planetary_shield  // Planetarer Schildfeldgenerator
-  dummy_building    // Dummy-Bau (für Fastbuild)
+  iron_mine        // Iron mine
+  silver_mine      // Silver mine
+  uderon_raffinery // Uderon refinery
+  h2_refinery      // H2 refinery
+  fusion_plant     // Fusion power plant
+  research_center  // Research center
+  shipyard          // Shipyard
+  space_station     // Space station
+  anti_spy          // Anti-spy shield
+  planetary_shield  // Planetary shield generator
+  dummy_building    // Dummy building (for fastbuild)
 }
 
 enum ShipType {
-  light_fighter
-  heavy_fighter
-  cruiser
+  fly
+  bumblebee
+  corvette
+  light_cruiser
+  heavy_cruiser
   battleship
-  colony_ship
-  recycler
-  espionage_probe
-  bomber
-  destroyer
-  deathstar
-  battlecruiser
-  small_cargo
-  large_cargo
+  battleship_nexus
+  battleship_phoenix
+  carrier_titan
+  colonizer
+  invasion_unit
+  ember_bomb
 }
 
 enum FleetMission {
@@ -188,11 +187,11 @@ enum FleetMission {
 }
 
 enum ResearchType {
-  iron_mining      // Eisenförderung +5% per level
-  silver_mining    // Silberförderung +5% per level
-  ember_extraction // Ember-Extraktion +5% per level
-  h2_refining      // H2-Raffinierung +5% per level
-  energy_efficiency // Energie-Effizienz +5% per level
+  iron_mining      // Iron mining +5% per level
+  silver_mining    // Silver mining +5% per level
+  ember_extraction // Ember extraction +5% per level
+  h2_refining      // H2 refining +5% per level
+  energy_efficiency // Energy efficiency +5% per level
   laser_technology
   ion_technology
   hyperspace_technology

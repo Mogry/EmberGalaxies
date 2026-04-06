@@ -3,6 +3,7 @@ import type { Planet, BuildingType, Building } from '@ember-galaxies/shared';
 import { calculateProduction, BUILDING_PRODUCTION, getBuildingUpgradeCost } from '@ember-galaxies/shared';
 import { useGameStore } from '../stores/gameStore';
 import { GameTimer } from './GameTimer';
+import { BuildingDetailModal } from './BuildingDetailModal';
 
 const RESOURCE_COLORS: Record<string, string> = {
   iron: 'text-blue-400',
@@ -25,18 +26,18 @@ interface PlanetViewProps {
 }
 
 const BUILDING_INFO: Record<BuildingType, { name: string; icon: string; description: string }> = {
-  zentrale: { name: 'Zentrale', icon: '🏛️', description: 'Zentrales Kontrollgebäude' },
-  iron_mine: { name: 'Eisenmine', icon: '🔩', description: 'Fördert Eisenvorkommen' },
-  silver_mine: { name: 'Silbermine', icon: '💎', description: 'Fördert Silberevorkommen' },
-  uderon_raffinery: { name: 'Uderon-Raffinerie', icon: '🔥', description: 'Veredelt Uderon' },
-  h2_refinery: { name: 'Wasserstoff-Raffinerie', icon: '⛽', description: 'Gewinnt H2 aus Meerwasser' },
-  fusion_plant: { name: 'Fusionskraftwerk', icon: '⚛️', description: 'Erzeugt Energie durch Fusion' },
-  research_center: { name: 'Forschungszentrum', icon: '🔬', description: 'Koordiniert Forschung' },
-  shipyard: { name: 'Werft', icon: '🚀', description: 'Baut Raumschiffe' },
-  space_station: { name: 'Raumstation', icon: '🛸', description: 'Orbitale Plattform' },
-  anti_spy: { name: 'Anti-Spionage-Schild', icon: '🛡️', description: 'Verhindert Ausspähung' },
-  planetary_shield: { name: 'Planetarer Schild', icon: '🌍', description: 'Abwehr aus dem Orbit' },
-  dummy_building: { name: 'Dummy-Bau', icon: '📦', description: 'Platzhalter für Fastbuild' },
+  zentrale: { name: 'Command Center', icon: '🏛️', description: 'Central control building' },
+  iron_mine: { name: 'Iron Mine', icon: '🔩', description: 'Mines iron ore' },
+  silver_mine: { name: 'Silver Mine', icon: '💎', description: 'Mines silver ore' },
+  uderon_raffinery: { name: 'Uderon Refinery', icon: '🔥', description: 'Refines uderon ore' },
+  h2_refinery: { name: 'H2 Refinery', icon: '⛽', description: 'Extracts H2 from seawater' },
+  fusion_plant: { name: 'Fusion Plant', icon: '⚛️', description: 'Generates energy through fusion' },
+  research_center: { name: 'Research Center', icon: '🔬', description: 'Coordinates research' },
+  shipyard: { name: 'Shipyard', icon: '🚀', description: 'Builds spacecraft' },
+  space_station: { name: 'Space Station', icon: '🛸', description: 'Orbital platform' },
+  anti_spy: { name: 'Anti-Spy Shield', icon: '🛡️', description: 'Prevents espionage' },
+  planetary_shield: { name: 'Planetary Shield', icon: '🌍', description: 'Orbital defense system' },
+  dummy_building: { name: 'Dummy Building', icon: '📦', description: 'Fastbuild placeholder' },
 };
 
 function getBuildingState(building: Building | undefined) {
@@ -95,6 +96,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
   };
 
   const [buildingAction, setBuildingAction] = useState<string | null>(null);
+  const [selectedBuildingType, setSelectedBuildingType] = useState<BuildingType | null>(null);
 
   const handleBuild = async (buildingType: BuildingType) => {
     if (buildingAction) return;
@@ -176,7 +178,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
               Position: System {planet.system?.index ?? '?'}
             </p>
             <p className="text-gray-500 text-sm">
-              Felder: {planet.fieldsUsed} / {planet.fieldsMax}
+              Fields: {planet.fieldsUsed} / {planet.fieldsMax}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -203,7 +205,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
 
       <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple overflow-hidden">
         <div className="bg-galaxy-purple/30 px-4 py-2">
-          <h3 className="text-lg font-semibold text-white">Gebäude</h3>
+          <h3 className="text-lg font-semibold text-white">Buildings</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
           {Object.entries(BUILDING_INFO).map(([type, info]) => {
@@ -216,15 +218,18 @@ export function PlanetView({ planet }: PlanetViewProps) {
                 className="bg-galaxy-darker rounded-lg p-4 border border-galaxy-purple/50"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setSelectedBuildingType(type as BuildingType)}
+                    className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
+                  >
                     <span className="text-2xl">{info.icon}</span>
                     <div>
                       <div className="text-white font-medium">{info.name}</div>
                       <div className="text-gray-500 text-sm">{info.description}</div>
                     </div>
-                  </div>
+                  </button>
                   <div className="text-right">
-                    <div className="text-ember-400 font-bold">Stufe {state.level}</div>
+                    <div className="text-ember-400 font-bold">Level {state.level}</div>
                     {state.level > 0 && (() => {
                       const config = BUILDING_PRODUCTION[type as keyof typeof BUILDING_PRODUCTION];
                       if (!config) return null;
@@ -241,7 +246,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
                 {state.isUpgrading && state.upgradeFinishAt ? (
                   <div className="mt-2 flex items-center justify-between">
                     <div>
-                      <div className="text-gray-400 text-xs mb-1">Ausbau läuft...</div>
+                      <div className="text-gray-400 text-xs mb-1">Upgrading...</div>
                       <GameTimer
                         finishAt={state.upgradeFinishAt}
                         onComplete={handleTimerComplete}
@@ -252,7 +257,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
                       onClick={() => handleCancelUpgrade(type as BuildingType)}
                       className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-sm rounded transition-colors"
                     >
-                      Abbrechen
+                      Cancel
                     </button>
                   </div>
                 ) : !state.exists ? (
@@ -265,7 +270,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
                         disabled={buildingAction !== null}
                         className="mt-2 px-3 py-2 bg-ember-600 hover:bg-ember-500 text-white rounded transition-colors w-full disabled:opacity-50"
                       >
-                        <div className="font-semibold">{buildingAction === type ? 'Baue...' : 'Bauen'}</div>
+                        <div className="font-semibold">{buildingAction === type ? 'Building...' : 'Build'}</div>
                         {costText && <div className="text-sm text-gray-300 mt-0.5">{costText}</div>}
                       </button>
                     );
@@ -280,7 +285,7 @@ export function PlanetView({ planet }: PlanetViewProps) {
                         disabled={buildingAction !== null}
                         className="mt-2 px-3 py-2 bg-ember-600 hover:bg-ember-500 text-white rounded transition-colors w-full disabled:opacity-50"
                       >
-                        <div className="font-semibold">{buildingAction === type ? 'Baue...' : (state.level === 0 ? 'Stufe 1 bauen' : 'Ausbauen')}</div>
+                        <div className="font-semibold">{buildingAction === type ? 'Building...' : (state.level === 0 ? 'Build Level 1' : 'Upgrade')}</div>
                         {costText && <div className="text-sm text-gray-300 mt-0.5">{costText}</div>}
                       </button>
                     );
@@ -291,6 +296,16 @@ export function PlanetView({ planet }: PlanetViewProps) {
           })}
         </div>
       </div>
+
+      {selectedBuildingType && (
+        <BuildingDetailModal
+          buildingType={selectedBuildingType}
+          currentLevel={getBuildingState(getBuilding(selectedBuildingType)).level}
+          planet={planet}
+          researchBonus={1.0}
+          onClose={() => setSelectedBuildingType(null)}
+        />
+      )}
     </div>
   );
 }

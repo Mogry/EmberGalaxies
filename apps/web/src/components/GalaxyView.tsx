@@ -74,7 +74,7 @@ export function GalaxyView() {
 
   const handleColonize = async (planet: Planet, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Planet "${planet.name}" besiedeln?`)) return;
+    if (!confirm(`Colonize planet "${planet.name}"?`)) return;
 
     const res = await fetch(`/api/game/planet/${planet.id}/colonize`, { method: 'POST' });
     if (res.ok) {
@@ -103,7 +103,7 @@ export function GalaxyView() {
 
         <form onSubmit={handleJump} className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <label className="text-gray-400">Galaxie:</label>
+            <label className="text-gray-400">Galaxy:</label>
             <input
               type="number"
               min="1"
@@ -132,7 +132,7 @@ export function GalaxyView() {
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f97316'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ea580c'}
           >
-            {loading ? 'Laden...' : 'Springen'}
+            {loading ? 'Loading...' : 'Jump'}
           </button>
         </form>
 
@@ -163,15 +163,15 @@ export function GalaxyView() {
                   {systemData.galaxy.name} - System {systemData.system.index}
                 </span>
                 <span className="ml-3 text-gray-400 text-sm">
-                  ({planets.length} Planet{planets.length !== 1 ? 'en' : ''})
+                  ({planets.length} Planet{planets.length !== 1 ? 's' : ''})
                 </span>
               </div>
               {star && (
                 <div className="flex items-center gap-3 text-amber-400">
                   <span className="text-2xl">☀️</span>
                   <div>
-                    <div className="text-sm">Temperatur: <span className="font-mono">{star.temperature}K</span></div>
-                    <div className="text-sm">Energie: <span className="font-mono">{star.energyOutput} kW</span></div>
+                    <div className="text-sm">Temperature: <span className="font-mono">{star.temperature}K</span></div>
+                    <div className="text-sm">Energy: <span className="font-mono">{star.energyOutput} kW</span></div>
                   </div>
                 </div>
               )}
@@ -182,7 +182,7 @@ export function GalaxyView() {
           {planets.length > 0 ? (
             <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple overflow-hidden">
               <div className="px-4 py-2 bg-galaxy-purple/20 text-sm text-gray-400 border-b border-galaxy-purple/30">
-                Alle Planeten (zum Ansehen klicken)
+                Alle Planeten (klicken zum Ansehen)
               </div>
               <div className="divide-y divide-galaxy-purple/20">
                 {planets.map((planet) => (
@@ -198,13 +198,13 @@ export function GalaxyView() {
                     </div>
                     <div className="text-right text-sm">
                       {planet.ownerId ? (
-                        <span className="text-amber-400">Besetzt</span>
+                        <span className="text-amber-400">Occupied</span>
                       ) : (
                         <button
                           onClick={(e) => handleColonize(planet, e)}
                           className="px-3 py-1 bg-ember-600 hover:bg-ember-500 text-white text-sm rounded transition-colors"
                         >
-                          Besiedeln
+                          Colonize
                         </button>
                       )}
                     </div>
@@ -214,7 +214,7 @@ export function GalaxyView() {
             </div>
           ) : (
             <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple p-8 text-center text-gray-500">
-              Keine Planeten in diesem System
+              No planets in this system
             </div>
           )}
         </div>

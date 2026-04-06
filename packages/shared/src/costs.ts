@@ -1,5 +1,13 @@
 import { BuildingType } from './types';
 
+export interface ShipCost {
+  iron: number;
+  silver: number;
+  ember?: number;
+  h2?: number;
+  energy?: number;
+}
+
 export interface BuildingCost {
   iron: number;
   silver: number;
@@ -235,6 +243,21 @@ export const BUILDING_COSTS: Record<BuildingType, BuildingCosts> = {
 
   // Dummy building - keine Kosten
   dummy_building: {},
+};
+
+export const SHIP_COSTS: Record<string, ShipCost> = {
+  fly:              { iron: 30,   silver: 10 },
+  bumblebee:        { iron: 50,   silver: 30 },
+  corvette:         { iron: 120,  silver: 60,  ember: 20 },
+  light_cruiser:    { iron: 300,  silver: 200, ember: 50,  h2: 50 },
+  heavy_cruiser:    { iron: 600,  silver: 400, ember: 100, h2: 100, energy: 50 },
+  battleship:       { iron: 1500, silver: 800, ember: 300, h2: 200, energy: 100 },
+  battleship_nexus: { iron: 4000, silver: 2500, ember: 800, h2: 500, energy: 300 },
+  battleship_phoenix: { iron: 10000, silver: 6000, ember: 2000, h2: 1500, energy: 800 },
+  carrier_titan:    { iron: 5000, silver: 4000, ember: 1500, h2: 1000, energy: 500 },
+  colonizer:        { iron: 10000, silver: 10000, ember: 5000, h2: 5000, energy: 5000 },
+  invasion_unit:     { iron: 15000, silver: 12000, ember: 8000, h2: 6000, energy: 4000 },
+  ember_bomb:       { iron: 50000, silver: 50000, ember: 30000, h2: 20000, energy: 20000 },
 };
 
 // Get cost for upgrading a building from currentLevel to currentLevel + 1

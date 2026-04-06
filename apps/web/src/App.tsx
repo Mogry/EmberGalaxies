@@ -46,7 +46,7 @@ function App() {
   if (!player) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'radial-gradient(circle at center, #1a1a3a 0%, #050510 100%)' }}>
-        <p style={{ color: '#9ca3af' }}>Lädt...</p>
+        <p style={{ color: '#9ca3af' }}>Loading...</p>
       </div>
     );
   }

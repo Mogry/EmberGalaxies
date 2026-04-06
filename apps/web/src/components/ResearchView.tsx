@@ -1,20 +1,20 @@
 import { useGameStore } from '../stores/gameStore';
 
 const RESEARCH_INFO: Record<string, { name: string; icon: string; description: string }> = {
-  energy_technology: { name: 'Energietechnik', icon: '⚡', description: 'Grundlage für viele Technologien' },
-  laser_technology: { name: 'Lasertechnik', icon: '🔦', description: 'Verbessert Waffen' },
-  ion_technology: { name: 'Iontechnik', icon: '⚛️', description: 'Verbessert Waffen' },
-  hyperspace_technology: { name: 'Hyperraumtechnik', icon: '🌀', description: 'Ermöglicht fortschrittliche Schiffe' },
-  plasma_technology: { name: 'Plasmatechnik', icon: '🔥', description: 'Verbessert Produktion' },
-  combustion_drive: { name: 'Verbrennungstriebwerk', icon: '🚀', description: 'Erhöht Geschwindigkeit' },
-  impulse_drive: { name: 'Impulstriebwerk', icon: '💨', description: 'Erhöht Geschwindigkeit' },
-  hyperspace_drive: { name: 'Hyperraumtriebwerk', icon: '🌌', description: 'Erhöht Geschwindigkeit' },
-  espionage_technology: { name: 'Spionagetechnik', icon: '🕵️', description: 'Verbessert Spionageberichte' },
-  computer_technology: { name: 'Computertechnik', icon: '💻', description: 'Erhöht Kolonienlimit' },
-  astrophysics: { name: 'Astrophysik', icon: '🔭', description: 'Ermöglicht Expeditionen' },
-  shield_technology: { name: 'Schildtechnik', icon: '🛡️', description: 'Verbessert Verteidigung' },
-  armour_technology: { name: 'Panzerungstechnik', icon: '🔩', description: 'Verbessert Hülle' },
-  weapons_technology: { name: 'Waffentechnik', icon: '⚔️', description: 'Verbessert Angriff' },
+  energy_technology: { name: 'Energy Technology', icon: '⚡', description: 'Foundation for many technologies' },
+  laser_technology: { name: 'Laser Technology', icon: '🔦', description: 'Improves weapons' },
+  ion_technology: { name: 'Ion Technology', icon: '⚛️', description: 'Improves weapons' },
+  hyperspace_technology: { name: 'Hyperspace Technology', icon: '🌀', description: 'Enables advanced ships' },
+  plasma_technology: { name: 'Plasma Technology', icon: '🔥', description: 'Improves production' },
+  combustion_drive: { name: 'Combustion Drive', icon: '🚀', description: 'Increases speed' },
+  impulse_drive: { name: 'Impulse Drive', icon: '💨', description: 'Increases speed' },
+  hyperspace_drive: { name: 'Hyperspace Drive', icon: '🌌', description: 'Increases speed' },
+  espionage_technology: { name: 'Espionage Technology', icon: '🕵️', description: 'Improves espionage reports' },
+  computer_technology: { name: 'Computer Technology', icon: '💻', description: 'Increases colony limit' },
+  astrophysics: { name: 'Astrophysics', icon: '🔭', description: 'Enables expeditions' },
+  shield_technology: { name: 'Shield Technology', icon: '🛡️', description: 'Improves defense' },
+  armour_technology: { name: 'Armour Technology', icon: '🔩', description: 'Improves hull' },
+  weapons_technology: { name: 'Weapons Technology', icon: '⚔️', description: 'Improves attack' },
 };
 
 export function ResearchView() {
@@ -47,7 +47,7 @@ export function ResearchView() {
   return (
     <div className="space-y-6">
       <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple p-6">
-        <h2 className="text-2xl font-bold text-white mb-4">🔬 Forschung</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">🔬 Research</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Object.entries(RESEARCH_INFO).map(([type, info]) => (
@@ -65,16 +65,16 @@ export function ResearchView() {
                 </div>
                 <div className="text-right">
                   <div className="text-ember-400 font-bold">
-                    Stufe {getResearchLevel(type)}
+                    Level {getResearchLevel(type)}
                   </div>
                   {isResearching(type) ? (
-                    <span className="text-yellow-400 text-sm">In Forschung</span>
+                    <span className="text-yellow-400 text-sm">Researching</span>
                   ) : (
                     <button
                       onClick={() => handleResearch(type)}
                       className="mt-1 px-3 py-1 bg-ember-600 hover:bg-ember-500 text-white text-sm rounded transition-colors"
                     >
-                      Erforschen
+                      Research
                     </button>
                   )}
                 </div>

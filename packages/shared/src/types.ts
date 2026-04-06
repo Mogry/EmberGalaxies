@@ -77,20 +77,31 @@ export type BuildingType =
   | 'planetary_shield'
   | 'dummy_building';
 
+export type DriveType = 'combustion' | 'impulse' | 'hyperspace' | 'nexus' | 'phoenix';
+
 export type ShipType =
-  | 'light_fighter'
-  | 'heavy_fighter'
-  | 'cruiser'
+  | 'fly'
+  | 'bumblebee'
+  | 'corvette'
+  | 'light_cruiser'
+  | 'heavy_cruiser'
   | 'battleship'
-  | 'colony_ship'
-  | 'recycler'
-  | 'espionage_probe'
-  | 'bomber'
-  | 'destroyer'
-  | 'deathstar'
-  | 'battlecruiser'
-  | 'small_cargo'
-  | 'large_cargo';
+  | 'battleship_nexus'
+  | 'battleship_phoenix'
+  | 'carrier_titan'
+  | 'colonizer'
+  | 'invasion_unit'
+  | 'ember_bomb';
+
+export interface ShipStats {
+  attack: number;
+  defense: number;
+  cargo: number;
+  drives: DriveType[];
+  buildTimeSeconds: number;
+  description: string;
+  className: string;
+}
 
 export interface FleetShip {
   id: string;
@@ -203,3 +214,4 @@ export const RESEARCH_BONUS_PER_LEVEL = 0.05; // 5% per level
 // Re-export costs and production utilities
 export * from './costs';
 export * from './production';
+export * from './ships';

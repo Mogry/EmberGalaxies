@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { prisma } from '../db/client';
 import { broadcastToPlayer } from '../websocket/broadcast';
+import { SHIP_BUILD_TIMES } from '@ember-galaxies/shared';
 
 export const shipyardRoutes = new Hono();
 
@@ -38,25 +39,7 @@ shipyardRoutes.post('/build', async (c) => {
     return c.json({ error: 'Already building this ship type' }, 400);
   }
 
-  // Calculate build time based on ship type and shipyard level
-  // Base times per ship (in seconds)
-  const SHIP_BUILD_TIMES: Record<string, number> = {
-    light_fighter: 60,
-    heavy_fighter: 120,
-    cruiser: 300,
-    battleship: 600,
-    colony_ship: 1200,
-    recycler: 180,
-    espionage_probe: 30,
-    bomber: 400,
-    destroyer: 500,
-    deathstar: 3600,
-    battlecruiser: 700,
-    small_cargo: 90,
-    large_cargo: 150,
-  };
-
-  const baseTime = SHIP_BUILD_TIMES[shipType] || 60;
+  const baseTime = SHIP_BUILD_TIMES[shipType as keyof typeof SHIP_BUILD_TIMES] || 60;
   // shipyard level reduces build time by 10% per level
   const buildTimeSeconds = baseTime * count * Math.pow(0.9, shipyardBuilding.level - 1);
   const finishAt = new Date(Date.now() + buildTimeSeconds * 1000);

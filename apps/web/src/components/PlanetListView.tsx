@@ -22,8 +22,8 @@ export function PlanetListView() {
   return (
     <div className="space-y-4">
       <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple p-6">
-        <h2 className="text-2xl font-bold text-white mb-2">🪐 Meine Planeten</h2>
-        <p className="text-gray-400">{sortedPlanets.length} Planet{sortedPlanets.length !== 1 ? 'en' : ''}</p>
+        <h2 className="text-2xl font-bold text-white mb-2">🪐 My Planets</h2>
+        <p className="text-gray-400">{sortedPlanets.length} Planet{sortedPlanets.length !== 1 ? 's' : ''}</p>
       </div>
 
       <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple overflow-hidden">
@@ -38,17 +38,17 @@ export function PlanetListView() {
               <div className="flex-1">
                 <div className="text-white font-semibold text-lg">{planet.name}</div>
                 <div className="text-gray-500 text-sm">
-                  Galaxie {planet.system?.galaxyIndex ?? '?'} · System {planet.system?.index ?? '?'} · Slot {planet.slot}
+                  Galaxy {planet.system?.galaxyIndex ?? '?'} · System {planet.system?.index ?? '?'} · Slot {planet.slot}
                 </div>
               </div>
               <div className="flex gap-6 text-sm">
                 <div className="text-center">
                   <div className="text-blue-400 font-medium">🔩 {Math.round(planet.iron)}</div>
-                  <div className="text-gray-600 text-xs">Eisen</div>
+                  <div className="text-gray-600 text-xs">Iron</div>
                 </div>
                 <div className="text-center">
                   <div className="text-purple-400 font-medium">💎 {Math.round(planet.silver)}</div>
-                  <div className="text-gray-600 text-xs">Silber</div>
+                  <div className="text-gray-600 text-xs">Silver</div>
                 </div>
                 <div className="text-center">
                   <div className="text-orange-400 font-medium">🔥 {Math.round(planet.ember)}</div>
@@ -69,7 +69,7 @@ export function PlanetListView() {
 
         {sortedPlanets.length === 0 && (
           <div className="p-8 text-center text-gray-500">
-            Noch keine Planeten. Besiedle einen Planeten in der Galaxie-Ansicht.
+            No planets yet. Colonize a planet in the Galaxy view.
           </div>
         )}
       </div>

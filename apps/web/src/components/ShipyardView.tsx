@@ -150,7 +150,7 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
 
       {/* Ship Selection */}
       <div className="p-4">
-        <h4 className="text-sm font-medium text-gray-400 mb-3">Schiffe bauen</h4>
+        <h4 className="text-sm font-medium text-gray-400 mb-3">Build Ships</h4>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {Object.entries(SHIP_INFO).map(([type, info]) => {
             const isBuilding = shipyards.some(s => s.shipType === type && s.isBuilding);

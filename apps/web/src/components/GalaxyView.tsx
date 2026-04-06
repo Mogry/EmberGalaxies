@@ -182,7 +182,7 @@ export function GalaxyView() {
           {planets.length > 0 ? (
             <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple overflow-hidden">
               <div className="px-4 py-2 bg-galaxy-purple/20 text-sm text-gray-400 border-b border-galaxy-purple/30">
-                Alle Planeten (klicken zum Ansehen)
+                All Planets (click to view)
               </div>
               <div className="divide-y divide-galaxy-purple/20">
                 {planets.map((planet) => (

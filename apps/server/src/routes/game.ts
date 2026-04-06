@@ -19,7 +19,7 @@ gameRoutes.get('/state/:playerId', async (c) => {
     where: { id: playerId },
     include: {
       planets: {
-        include: { buildings: true, shipyards: true },
+        include: { buildings: true, shipyards: true, planetShips: true },
       },
       fleets: {
         include: { ships: true },
@@ -75,6 +75,7 @@ gameRoutes.get('/planet/:planetId', async (c) => {
     include: {
       system: { include: { star: true } },
       buildings: true,
+      planetShips: true,
       owner: true,
     },
   });
@@ -209,6 +210,7 @@ gameRoutes.get('/planets/:playerId', async (c) => {
       system: { include: { star: true } },
       buildings: true,
       shipyards: true,
+      planetShips: true,
     },
   });
 

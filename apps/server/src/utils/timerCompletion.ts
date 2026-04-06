@@ -98,14 +98,18 @@ export async function processExpiredTimers(): Promise<CompletedResult> {
   });
 
   for (const ship of expiredShips) {
-    // Mark ship as complete (isBuilding = false)
-    await prisma.shipyard.update({
-      where: { id: ship.id },
-      data: {
-        isBuilding: false,
-        buildFinishAt: null,
-      },
+    // Add completed ships to planet stock
+    await prisma.planetShip.upsert({
+      where: { planetId_shipType: { planetId: ship.planetId, shipType: ship.shipType } },
+      create: { planetId: ship.planetId, shipType: ship.shipType, count: ship.count },
+      update: { count: { increment: ship.count } },
     });
+
+    // Delete queue entry (or mark not building)
+    await prisma.shipyard.deleteMany({
+      where: { planetId: ship.planetId, shipType: ship.shipType, isBuilding: true },
+    });
+
     result.shipCompletions.push({
       planetId: ship.planetId,
       shipType: ship.shipType,

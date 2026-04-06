@@ -58,6 +58,7 @@ model Planet {
   updatedAt   DateTime  @updatedAt
   buildings   Building[]
   shipyards   Shipyard[]
+  planetShips PlanetShip[]
   originFleets Fleet[]  @relation("OriginPlanet")
   targetFleets Fleet[]  @relation("TargetPlanet")
 
@@ -143,6 +144,17 @@ model Shipyard {
   buildFinishAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  @@unique([planetId, shipType])
+}
+
+model PlanetShip {
+  planetId   String
+  shipType  ShipType
+  count     Int       @default(0)
+  planet    Planet    @relation(fields: [planetId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@unique([planetId, shipType])
 }

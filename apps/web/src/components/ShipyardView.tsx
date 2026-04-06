@@ -6,12 +6,17 @@ interface ShipyardViewProps {
   planet: Planet;
 }
 
-interface ShipyardEntry {
+interface QueueEntry {
   id: string;
   shipType: string;
   count: number;
-  isBuilding: boolean;
-  buildFinishAt: Date | null;
+  buildFinishAt: string | null;
+}
+
+interface StockEntry {
+  planetId: string;
+  shipType: string;
+  count: number;
 }
 
 const SHIP_INFO: Record<string, { name: string; icon: string; description: string }> = {
@@ -30,7 +35,8 @@ const SHIP_INFO: Record<string, { name: string; icon: string; description: strin
 };
 
 export function ShipyardView({ planet }: ShipyardViewProps) {
-  const [shipyards, setShipyards] = useState<ShipyardEntry[]>([]);
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
+  const [stock, setStock] = useState<StockEntry[]>([]);
   const [selectedShip, setSelectedShip] = useState<string | null>(null);
   const [count, setCount] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -40,14 +46,14 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
       const res = await fetch(`/api/shipyard/planet/${planet.id}`);
       if (res.ok) {
         const data = await res.json();
-        setShipyards(data);
+        setQueue(data.queue ?? []);
+        setStock(data.stock ?? []);
       }
     } catch (error) {
       console.error('Failed to fetch shipyards:', error);
     }
   };
 
-  // Load shipyards on mount
   useEffect(() => {
     refreshShipyards();
   }, [planet.id]);
@@ -63,6 +69,7 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
       if (res.ok) {
         await refreshShipyards();
         setSelectedShip(null);
+        setCount(1);
       }
     } catch (error) {
       console.error('Failed to build ship:', error);
@@ -90,7 +97,6 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
     refreshShipyards();
   };
 
-  // Check if planet has shipyard
   const hasShipyard = planet.buildings?.some(b => b.type === 'shipyard' && b.level > 0);
   if (!hasShipyard) {
     return (
@@ -101,8 +107,13 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
     );
   }
 
-  // Get shipyards that are currently building
-  const buildingShips = shipyards.filter(s => s.isBuilding);
+  const getStockCount = (shipType: string) => {
+    return stock.find(s => s.shipType === shipType)?.count ?? 0;
+  };
+
+  const isQueued = (shipType: string) => {
+    return queue.some(q => q.shipType === shipType);
+  };
 
   return (
     <div className="bg-galaxy-dark rounded-lg border border-galaxy-purple overflow-hidden">
@@ -110,32 +121,32 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
         <h3 className="text-lg font-semibold text-white">🚢 Shipyard</h3>
       </div>
 
-      {/* Currently Building */}
-      {buildingShips.length > 0 && (
+      {/* Queue — active batches */}
+      {queue.length > 0 && (
         <div className="p-4 border-b border-galaxy-purple/30">
           <h4 className="text-sm font-medium text-gray-400 mb-3">Building</h4>
           <div className="space-y-2">
-            {buildingShips.map(ship => {
-              const info = SHIP_INFO[ship.shipType] || { name: ship.shipType, icon: '🚀', description: '' };
+            {queue.map(entry => {
+              const info = SHIP_INFO[entry.shipType] ?? { name: entry.shipType, icon: '🚀', description: '' };
               return (
-                <div key={ship.id} className="flex items-center justify-between bg-galaxy-darker rounded p-3">
+                <div key={entry.id} className="flex items-center justify-between bg-galaxy-darker rounded p-3">
                   <div className="flex items-center space-x-3">
                     <span className="text-xl">{info.icon}</span>
                     <div>
                       <div className="text-white font-medium">{info.name}</div>
-                      <div className="text-gray-500 text-xs">x{ship.count}</div>
+                      <div className="text-gray-500 text-xs">x{entry.count}</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
-                    {ship.buildFinishAt && (
+                    {entry.buildFinishAt && (
                       <GameTimer
-                        finishAt={ship.buildFinishAt}
+                        finishAt={entry.buildFinishAt}
                         onComplete={handleTimerComplete}
                         compact
                       />
                     )}
                     <button
-                      onClick={() => handleCancel(ship.shipType)}
+                      onClick={() => handleCancel(entry.shipType)}
                       className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
                     >
                       Cancel
@@ -148,12 +159,31 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
         </div>
       )}
 
-      {/* Ship Selection */}
+      {/* Stock — completed ships */}
+      {stock.length > 0 && (
+        <div className="p-4 border-b border-galaxy-purple/30">
+          <h4 className="text-sm font-medium text-gray-400 mb-3">Fleet Stock</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {stock.map(entry => {
+              const info = SHIP_INFO[entry.shipType] ?? { name: entry.shipType, icon: '🚀', description: '' };
+              return (
+                <div key={entry.shipType} className="flex items-center gap-2 bg-galaxy-darker rounded p-2">
+                  <span className="text-lg">{info.icon}</span>
+                  <span className="text-white text-sm">{info.name}</span>
+                  <span className="text-gray-400 text-sm ml-auto">x{entry.count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Build section */}
       <div className="p-4">
         <h4 className="text-sm font-medium text-gray-400 mb-3">Build Ships</h4>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {Object.entries(SHIP_INFO).map(([type, info]) => {
-            const isBuilding = shipyards.some(s => s.shipType === type && s.isBuilding);
+            const isBuilding = isQueued(type);
             return (
               <button
                 key={type}
@@ -167,9 +197,14 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
                     : 'bg-galaxy-darker border-galaxy-purple/50 hover:border-galaxy-purple'
                 }`}
               >
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-lg">{info.icon}</span>
-                  <span className="text-white text-sm font-medium">{info.name}</span>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg">{info.icon}</span>
+                    <span className="text-white text-sm font-medium">{info.name}</span>
+                  </div>
+                  {getStockCount(type) > 0 && (
+                    <span className="text-xs text-gray-400">x{getStockCount(type)}</span>
+                  )}
                 </div>
                 <div className="text-gray-500 text-xs">{info.description}</div>
               </button>
@@ -189,10 +224,10 @@ export function ShipyardView({ planet }: ShipyardViewProps) {
               <input
                 type="number"
                 min={1}
-                max={100}
+                max={10000}
                 value={count}
                 onChange={e => setCount(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-20 px-2 py-1 bg-galaxy-dark border border-galaxy-purple rounded text-white"
+                className="w-24 px-2 py-1 bg-galaxy-dark border border-galaxy-purple rounded text-white"
               />
             </div>
             <div className="flex space-x-2 mt-3">

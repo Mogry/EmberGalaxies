@@ -6,6 +6,7 @@ import { FleetView } from './components/FleetView';
 import { ResearchView } from './components/ResearchView';
 import { ResourceBar } from './components/ResourceBar';
 import { PlanetListView } from './components/PlanetListView';
+import { ShipyardView } from './components/ShipyardView';
 import { useWebSocket } from './hooks/useWebSocket';
 
 function App() {
@@ -61,7 +62,7 @@ function App() {
             {['galaxy', 'planets', 'planet', 'fleet', 'research'].map((v) => (
               <button
                 key={v}
-                onClick={() => setView(v as 'galaxy' | 'planets' | 'planet' | 'fleet' | 'research')}
+                onClick={() => setView(v as typeof view)}
                 className={`px-4 py-3 capitalize`}
                 style={{
                   color: view === v ? '#fb923c' : '#9ca3af',
@@ -83,6 +84,26 @@ function App() {
                 {v}
               </button>
             ))}
+            {view === 'planet' && selectedPlanet?.buildings?.some(b => b.type === 'shipyard' && b.level > 0) && (
+              <button
+                key="shipyard"
+                onClick={() => setView('shipyard')}
+                className="px-4 py-3 capitalize"
+                style={{
+                  color: view === 'shipyard' ? '#fb923c' : '#9ca3af',
+                  borderBottom: view === 'shipyard' ? '2px solid #fb923c' : 'none',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  if (view !== 'shipyard') e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  if (view !== 'shipyard') e.currentTarget.style.color = '#9ca3af';
+                }}
+              >
+                🚢 Shipyard
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -91,6 +112,7 @@ function App() {
         {view === 'galaxy' && <GalaxyView />}
         {view === 'planets' && <PlanetListView />}
         {view === 'planet' && selectedPlanet && <PlanetView planet={selectedPlanet} />}
+            {view === 'shipyard' && selectedPlanet && <ShipyardView planet={selectedPlanet} />}
         {view === 'fleet' && <FleetView />}
         {view === 'research' && <ResearchView />}
       </main>

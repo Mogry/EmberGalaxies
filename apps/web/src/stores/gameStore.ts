@@ -7,14 +7,14 @@ interface GameState {
   fleets: Fleet[];
   research: Research[];
   selectedPlanet: Planet | null;
-  view: 'galaxy' | 'planet' | 'planets' | 'fleet' | 'research';
+  view: 'galaxy' | 'planet' | 'planets' | 'fleet' | 'research' | 'shipyard';
 
   setPlayer: (player: Player | null) => void;
   setPlanets: (planets: Planet[]) => void;
   setFleets: (fleets: Fleet[]) => void;
   setResearch: (research: Research[]) => void;
   setSelectedPlanet: (planet: Planet | null) => void;
-  setView: (view: 'galaxy' | 'planet' | 'planets' | 'fleet' | 'research') => void;
+  setView: (view: 'galaxy' | 'planet' | 'planets' | 'fleet' | 'research' | 'shipyard') => void;
   updateResources: (planetId: string, resources: { iron?: number; silver?: number; ember?: number; h2?: number; energy?: number }) => void;
   updatePlanet: (planet: Planet) => void;
 }

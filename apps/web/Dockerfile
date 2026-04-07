@@ -15,9 +15,6 @@ RUN bun run --filter @ember-galaxies/web build
 FROM node:22-alpine AS production
 WORKDIR /app
 
-# Install bun for running vite
-RUN npm install -g bun
-
 # Copy built artifacts and node_modules
 COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/apps/web/dist ./dist
@@ -25,5 +22,5 @@ COPY --from=base /app/apps/web/package.json ./package.json
 
 EXPOSE 5173
 
-# Run with node directly (not bunx) for Node.js 22 compatibility
-CMD ["node", "node_modules/vite/bin/vite.js", "preview", "--port", "5173", "--host"]
+# Use bunx from node_modules (installed via npm) to run vite
+CMD ["npx", "vite", "preview", "--port", "5173", "--host"]

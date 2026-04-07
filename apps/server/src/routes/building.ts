@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { prisma } from '../db/client';
 import { getBuildingUpgradeCost } from '@ember-galaxies/shared';
 import { devBuildTimeMultiplier } from '../utils/dev';
+import { processExpiredTimers } from '../utils/timerCompletion';
 
 export const buildingRoutes = new Hono();
 
@@ -9,8 +10,12 @@ export const buildingRoutes = new Hono();
 buildingRoutes.get('/planet/:planetId', async (c) => {
   const { planetId } = c.req.param();
 
+  // Process any expired timers first so queue reflects correct state
+  await processExpiredTimers();
+
   const buildings = await prisma.building.findMany({
     where: { planetId },
+    include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } },
   });
 
   return c.json(buildings);
@@ -33,12 +38,17 @@ buildingRoutes.post('/upgrade', async (c) => {
   const body = await c.req.json();
   const { planetId, buildingType } = body;
 
-  // Check if ANY building on this planet is currently upgrading
-  const upgradingBuildings = await prisma.building.findMany({
-    where: { planetId, isUpgrading: true },
+  // Check if ANY building on this planet has an active queue (max 1 upgrade per planet)
+  const buildingsWithQueue = await prisma.building.findMany({
+    where: { planetId },
+    include: { constructionQueue: true },
   });
 
-  if (upgradingBuildings.length > 0) {
+  const hasActiveQueue = buildingsWithQueue.some(b =>
+    b.constructionQueue && b.constructionQueue.length > 0
+  );
+
+  if (hasActiveQueue) {
     return c.json({ error: 'Another building is already upgrading on this planet' }, 400);
   }
 
@@ -48,10 +58,6 @@ buildingRoutes.post('/upgrade', async (c) => {
 
   if (!existing) {
     return c.json({ error: 'Building not found' }, 404);
-  }
-
-  if (existing.isUpgrading) {
-    return c.json({ error: 'Building is already upgrading' }, 400);
   }
 
   // Get cost for this upgrade
@@ -71,7 +77,7 @@ buildingRoutes.post('/upgrade', async (c) => {
     return c.json({ error: 'Not enough resources', missing: cost }, 400);
   }
 
-  // Deduct resources and start upgrade in a transaction
+  // Deduct resources and create queue entry in a transaction
   const buildTimeSeconds = Math.pow(existing.level + 1, 2) * 60 * devBuildTimeMultiplier();
   const finishAt = new Date(Date.now() + buildTimeSeconds * 1000);
 
@@ -86,10 +92,10 @@ buildingRoutes.post('/upgrade', async (c) => {
         energy: { decrement: cost.energy ?? 0 },
       },
     }),
-    prisma.building.update({
-      where: { id: existing.id },
+    prisma.constructionQueue.create({
       data: {
-        isUpgrading: true,
+        buildingId: existing.id,
+        targetLevel: existing.level + 1,
         upgradeFinishAt: finishAt,
       },
     }),
@@ -98,7 +104,7 @@ buildingRoutes.post('/upgrade', async (c) => {
   // Fetch full planet with relations
   const updatedPlanet = await prisma.planet.findUnique({
     where: { id: planetId },
-    include: { system: { include: { star: true } }, buildings: true, shipyards: true, owner: true },
+    include: { system: { include: { star: true } }, buildings: { include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } } }, shipyards: true, owner: true },
   });
 
   // Add galaxyIndex
@@ -112,24 +118,25 @@ buildingRoutes.post('/upgrade', async (c) => {
 // Cancel building upgrade
 buildingRoutes.post('/cancel', async (c) => {
   const body = await c.req.json();
-  const { planetId, buildingType } = body;
+  const { planetId, queueId } = body;
 
-  const building = await prisma.building.findUnique({
-    where: { planetId_type: { planetId, type: buildingType } },
+  const queueEntry = await prisma.constructionQueue.findUnique({
+    where: { id: queueId },
+    include: { building: true },
   });
 
-  if (!building) {
-    return c.json({ error: 'Building not found' }, 404);
+  if (!queueEntry) {
+    return c.json({ error: 'Queue entry not found' }, 404);
   }
 
-  if (!building.isUpgrading) {
-    return c.json({ error: 'Building is not upgrading' }, 400);
+  if (queueEntry.building.planetId !== planetId) {
+    return c.json({ error: 'Queue entry not on this planet' }, 400);
   }
 
-  // Get cost to refund
-  const cost = getBuildingUpgradeCost(buildingType, building.level);
+  // Get cost to refund (from current building level to targetLevel)
+  const cost = getBuildingUpgradeCost(queueEntry.building.type, queueEntry.building.level);
 
-  // Refund resources and cancel upgrade
+  // Refund resources and delete queue entry
   await prisma.$transaction([
     cost ? prisma.planet.update({
       where: { id: planetId },
@@ -141,19 +148,15 @@ buildingRoutes.post('/cancel', async (c) => {
         energy: { increment: cost.energy ?? 0 },
       },
     }) : prisma.planet.update({ where: { id: planetId }, data: {} }),
-    prisma.building.update({
-      where: { id: building.id },
-      data: {
-        isUpgrading: false,
-        upgradeFinishAt: null,
-      },
+    prisma.constructionQueue.delete({
+      where: { id: queueId },
     }),
   ]);
 
   // Fetch full planet with relations
   const planet = await prisma.planet.findUnique({
     where: { id: planetId },
-    include: { system: { include: { star: true } }, buildings: true, shipyards: true, owner: true },
+    include: { system: { include: { star: true } }, buildings: { include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } } }, shipyards: true, owner: true },
   });
 
   // Add galaxyIndex
@@ -169,12 +172,17 @@ buildingRoutes.post('/construct', async (c) => {
   const body = await c.req.json();
   const { planetId, buildingType } = body;
 
-  // Check if ANY building on this planet is currently upgrading
-  const upgradingBuildings = await prisma.building.findMany({
-    where: { planetId, isUpgrading: true },
+  // Check if ANY building on this planet has an active queue (max 1 upgrade per planet)
+  const buildingsWithQueue = await prisma.building.findMany({
+    where: { planetId },
+    include: { constructionQueue: true },
   });
 
-  if (upgradingBuildings.length > 0) {
+  const hasActiveQueue = buildingsWithQueue.some(b =>
+    b.constructionQueue && b.constructionQueue.length > 0
+  );
+
+  if (hasActiveQueue) {
     return c.json({ error: 'Another building is already upgrading on this planet' }, 400);
   }
 
@@ -207,7 +215,15 @@ buildingRoutes.post('/construct', async (c) => {
   const buildTimeSeconds = 60 * devBuildTimeMultiplier(); // 1 minute for level 1
   const finishAt = new Date(Date.now() + buildTimeSeconds * 1000);
 
-  // Deduct resources and create building in a transaction
+  // Create building at level 0 and queue entry for level 1
+  const building = await prisma.building.create({
+    data: {
+      planetId,
+      type: buildingType,
+      level: 0,
+    },
+  });
+
   await prisma.$transaction([
     prisma.planet.update({
       where: { id: planetId },
@@ -219,12 +235,10 @@ buildingRoutes.post('/construct', async (c) => {
         energy: { decrement: cost.energy ?? 0 },
       },
     }),
-    prisma.building.create({
+    prisma.constructionQueue.create({
       data: {
-        planetId,
-        type: buildingType,
-        level: 0,
-        isUpgrading: true,
+        buildingId: building.id,
+        targetLevel: 1,
         upgradeFinishAt: finishAt,
       },
     }),
@@ -233,7 +247,7 @@ buildingRoutes.post('/construct', async (c) => {
   // Fetch full planet with relations
   const updatedPlanet = await prisma.planet.findUnique({
     where: { id: planetId },
-    include: { system: { include: { star: true } }, buildings: true, shipyards: true, owner: true },
+    include: { system: { include: { star: true } }, buildings: { include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } } }, shipyards: true, owner: true },
   });
 
   // Add galaxyIndex

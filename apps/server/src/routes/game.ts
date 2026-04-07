@@ -19,7 +19,7 @@ gameRoutes.get('/state/:playerId', async (c) => {
     where: { id: playerId },
     include: {
       planets: {
-        include: { buildings: true, shipyards: true, planetShips: true },
+        include: { buildings: { include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } } }, shipyards: true, planetShips: true },
       },
       fleets: {
         include: { ships: true },
@@ -125,7 +125,7 @@ gameRoutes.post('/player', async (c) => {
     // Re-fetch with updated planet data
     const refreshed = await prisma.player.findUnique({
       where: { id: existingPlayer.id },
-      include: { planets: { include: { buildings: true } } },
+      include: { planets: { include: { buildings: { include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } } } } } },
     });
     return c.json(refreshed);
   }
@@ -189,7 +189,7 @@ gameRoutes.post('/player', async (c) => {
 
   const completePlanet = await prisma.planet.findUnique({
     where: { id: planet.id },
-    include: { system: { include: { star: true } }, buildings: true, shipyards: true },
+    include: { system: { include: { star: true } }, buildings: { include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } } }, shipyards: true },
   });
 
   return c.json({ ...player, planets: [completePlanet] }, 201);
@@ -208,7 +208,7 @@ gameRoutes.get('/planets/:playerId', async (c) => {
     where: { ownerId: playerId },
     include: {
       system: { include: { star: true } },
-      buildings: true,
+      buildings: { include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } } },
       shipyards: true,
       planetShips: true,
     },

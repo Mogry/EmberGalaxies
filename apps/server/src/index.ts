@@ -7,6 +7,7 @@ import { buildingRoutes } from './routes/building';
 import { researchRoutes } from './routes/research';
 import { shipyardRoutes } from './routes/shipyard';
 import { addClient, removeClientFromAll } from './websocket/broadcast';
+import { globalRateLimit, heavyRateLimit } from './middleware/rateLimit';
 
 const { websocket, upgradeWebSocket } = createBunWebSocket();
 
@@ -19,7 +20,14 @@ app.use('/*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Health check
+// Global rate limiting (60 req/min) — applies to /api routes only
+// WebSocket (/ws) is excluded from rate limiting
+app.use('/api/*', globalRateLimit());
+
+// Heavy action rate limiting (5 req/min) — applied on specific endpoints
+app.use('/api/*', heavyRateLimit());
+
+// Health check (unauthenticated, no rate limit)
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // API Routes

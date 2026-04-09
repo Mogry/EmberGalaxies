@@ -10,6 +10,7 @@ datasource db {
 model Galaxy {
   id        String   @id @default(cuid())
   name      String   @unique
+  index     Int      @default(0)
   systems   System[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -61,6 +62,7 @@ model Planet {
   planetShips PlanetShip[]
   originFleets Fleet[]  @relation("OriginPlanet")
   targetFleets Fleet[]  @relation("TargetPlanet")
+  combatReports CombatReport[]
 
   @@unique([systemId, slot])
 }
@@ -72,9 +74,11 @@ model Player {
   isBot     Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  planets   Planet[]
-  fleets    Fleet[]
-  research  Research[]
+  planets         Planet[]
+  fleets          Fleet[]
+  research        Research[]
+  attackerReports CombatReport[] @relation("AttackerReports")
+  defenderReports CombatReport[] @relation("DefenderReports")
 }
 
 model Building {
@@ -168,6 +172,23 @@ model PlanetShip {
   updatedAt DateTime  @updatedAt
 
   @@unique([planetId, shipType])
+}
+
+model CombatReport {
+  id              String   @id @default(cuid())
+  attackerId      String
+  attacker        Player   @relation("AttackerReports", fields: [attackerId], references: [id])
+  defenderId      String
+  defender        Player   @relation("DefenderReports", fields: [defenderId], references: [id])
+  planetId        String
+  planet          Planet   @relation(fields: [planetId], references: [id])
+  mission         FleetMission
+  winner          String   // 'ATTACKER' | 'DEFENDER' | 'DRAW'
+  attackerShips   Json     // { sent: [...], lost: [...], remaining: [...] }
+  defenderShips   Json     // { sent: [...], lost: [...], remaining: [...] }
+  loot            Json?    // { iron, silver, ember, h2, energy } or null if defender won
+  fuelCost        Float    // Total round-trip H2 cost for the attacking fleet
+  createdAt       DateTime @default(now())
 }
 
 enum BuildingType {

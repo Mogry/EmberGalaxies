@@ -1,5 +1,5 @@
 import { prisma } from '../db/client';
-import { calculateOfflineProduction } from '@ember-galaxies/shared';
+import { calculateOfflineProduction, calculateCombat, calculateLoot, SHIP_STATS } from '@ember-galaxies/shared';
 import { broadcastToPlayer } from '../websocket/broadcast';
 import type { FleetMission, ShipType } from '@ember-galaxies/shared';
 
@@ -119,6 +119,17 @@ interface InMemoryPlanetState {
     isUpgrading: boolean;
     upgradeFinishAt: Date | null;
   }>;
+  defenderShips: Array<{ type: ShipType; count: number }>; // planetShips + deployed fleets
+}
+
+// Combat result stored per fleet arrival for use in fleet writes
+interface CombatOutcome {
+  winner: 'ATTACKER' | 'DEFENDER' | 'DRAW';
+  attackersRemaining: Array<{ type: ShipType; count: number }>;
+  defendersRemaining: Array<{ type: ShipType; count: number }>;
+  attackerLost: Array<{ type: ShipType; count: number }>;
+  defenderLost: Array<{ type: ShipType; count: number }>;
+  loot: { iron: number; silver: number; ember: number; h2: number; energy: number };
 }
 
 // =============================================================================
@@ -141,12 +152,13 @@ function computeReturnTime(
 /**
  * Resolve a fleet arrival into the game state (in-memory).
  * Mutates planetState.resources and fleetShipCounts, and may change planet owner.
+ * Returns a CombatOutcome for attack/invasion/destroy missions, or undefined for others.
  */
 function resolveFleetArrival(
   event: FleetArrivalEvent,
   planetState: InMemoryPlanetState,
   fleetShipCounts: Map<string, Map<string, number>>,
-): void {
+): CombatOutcome | undefined {
   const { payload } = event;
 
   // Add transported resources to planet
@@ -170,9 +182,8 @@ function resolveFleetArrival(
       // Ships are consumed — fleet is "empty" (no remaining ships)
       // transport: fleet returns home (handled in fleet writes)
       // deployment: fleet stays in orbit with returnsAt = null (handled in fleet writes)
-      // Clear the ship counts so remainingShips = []
       shipCounts.clear();
-      break;
+      return undefined;
     }
 
     case 'colonize': {
@@ -184,18 +195,123 @@ function resolveFleetArrival(
         shipCounts.set('colonizer', colonizerCount - 1);
         if (colonizerCount === 1) shipCounts.delete('colonizer');
       }
-      break;
+      return undefined;
     }
 
     case 'attack':
     case 'invasion':
-    case 'destroy':
+    case 'destroy': {
+      // === COMBAT RESOLUTION ===
+      const attackerFleet = {
+        ships: payload.ships,
+        weaponsTech: 0,
+        shieldTech: 0,
+        armourTech: 0,
+      };
+
+      // Defender forces: planet ships + deployed fleets on this planet
+      const defenderShips = [...planetState.defenderShips];
+
+      const defenderForces = {
+        ships: defenderShips,
+        weaponsTech: 0,
+        shieldTech: 0,
+        armourTech: 0,
+      };
+
+      // Run combat
+      const result = calculateCombat(attackerFleet, defenderForces);
+
+      // Calculate total fuel cost for loot calculation
+      // We need the H2 cost for the round trip — estimate from the fleet
+      let totalH2Cost = 0;
+      for (const ship of payload.ships) {
+        const stats = SHIP_STATS[ship.type];
+        totalH2Cost += ship.count * stats.h2Factor;
+      }
+      // Simplified: the actual H2 cost was computed at launch time based on distance & drive.
+      // We use the fleet's carried H2 as a proxy (the fleet already consumed outbound fuel,
+      // but the totalFuelCost field is what matters for the return-fuel reserve).
+      // For now, we estimate totalH2Cost = carried H2 * 2 (round trip assumption).
+      // TODO: Store actual fuel cost on Fleet model for precise calculation.
+      const fuelCostEstimate = payload.h2 * 2;
+
+      // Calculate loot if attacker won
+      let loot = { iron: 0, silver: 0, ember: 0, h2: 0, energy: 0 };
+      if (result.winner === 'ATTACKER') {
+        loot = calculateLoot(
+          result.attackersRemaining,
+          fuelCostEstimate,
+          {
+            iron: planetState.iron,
+            silver: planetState.silver,
+            ember: planetState.ember,
+            h2: planetState.h2,
+            energy: planetState.energy,
+          },
+        );
+
+        // Deduct loot from planet
+        planetState.iron -= loot.iron;
+        planetState.silver -= loot.silver;
+        planetState.ember -= loot.ember;
+        planetState.h2 -= loot.h2;
+        planetState.energy -= loot.energy;
+      }
+
+      // Update planet defender ships (destroyed ships are removed)
+      planetState.defenderShips = result.defendersRemaining;
+
+      // Update fleet ship counts with remaining attackers
+      shipCounts.clear();
+      for (const ship of result.attackersRemaining) {
+        shipCounts.set(ship.type, ship.count);
+      }
+
+      const outcome: CombatOutcome = {
+        winner: result.winner,
+        attackersRemaining: result.attackersRemaining,
+        defendersRemaining: result.defendersRemaining,
+        attackerLost: result.attackerLost,
+        defenderLost: result.defenderLost,
+        loot,
+      };
+
+      // Mission-specific post-combat effects
+      if (result.winner === 'ATTACKER') {
+        if (payload.mission === 'invasion') {
+          // Invasion unit needed — check if at least one survives
+          const invasionUnits = result.attackersRemaining.find(s => s.type === 'invasion_unit');
+          if (invasionUnits && invasionUnits.count > 0) {
+            // Planet ownership transfers to attacker
+            planetState.ownerId = payload.ownerId;
+          }
+        } else if (payload.mission === 'destroy') {
+          // Ember bomb needed — check if at least one survives
+          const bombs = result.attackersRemaining.find(s => s.type === 'ember_bomb');
+          if (bombs && bombs.count > 0) {
+            // Planet is destroyed — zero out resources and remove owner
+            planetState.iron = 0;
+            planetState.silver = 0;
+            planetState.ember = 0;
+            planetState.h2 = 0;
+            planetState.energy = 0;
+            planetState.ownerId = null;
+            // Remove all planet ships
+            planetState.defenderShips = [];
+          }
+        }
+      }
+
+      return outcome;
+    }
+
     case 'harvest':
     case 'espionage':
     default:
       // Combat logic deferred — ships are consumed in the fight
       shipCounts.clear();
-      break;
+      return undefined;
   }
 }
 
@@ -246,6 +362,7 @@ export async function syncPlanet(
         originFleets: { where: { arrivesAt: { lte: currentTime } } },
         targetFleets: { where: { arrivesAt: { lte: currentTime } } },
         shipyards: { where: { isBuilding: true, buildFinishAt: { lte: currentTime } } },
+        planetShips: true,
       },
     });
 
@@ -393,6 +510,10 @@ export async function syncPlanet(
         isUpgrading: b.isUpgrading,
         upgradeFinishAt: b.upgradeFinishAt,
       })),
+      defenderShips: planet.planetShips.map(ps => ({
+        type: ps.shipType as ShipType,
+        count: ps.count,
+      })),
     };
 
     // Track which fleets need updates after we know their return times
@@ -402,6 +523,7 @@ export async function syncPlanet(
       mission: FleetMission;
       ownerId: string;
       remainingShips: Array<{ type: ShipType; count: number }>;
+      combatOutcome?: CombatOutcome;
     }> = [];
 
     // Map of fleetId -> shipType -> count for fleets being resolved
@@ -529,8 +651,8 @@ export async function syncPlanet(
         case 'fleet_arrival': {
           const arrival = event.payload;
 
-          // Resolve resources and ownership changes in planet state
-          resolveFleetArrival(event, planetState, fleetShipCounts);
+          // Resolve resources, ownership changes, and combat in planet state
+          const combatOutcome = resolveFleetArrival(event, planetState, fleetShipCounts);
 
           // Queue the fleet write (remainingShips derived after resolveFleetArrival mutates fleetShipCounts)
           fleetWrites.push({
@@ -539,9 +661,10 @@ export async function syncPlanet(
             mission: arrival.mission,
             ownerId: arrival.ownerId,
             remainingShips: getFleetShips(arrival.fleetId),
+            combatOutcome,
           });
 
-          // Broadcast
+          // Broadcast fleet arrival
           broadcastToPlayer(arrival.ownerId, {
             type: 'fleet_arrival',
             data: {
@@ -551,6 +674,32 @@ export async function syncPlanet(
             },
             timestamp: event.timestamp.toISOString(),
           });
+
+          // Broadcast combat report to both players
+          if (combatOutcome) {
+            const combatReportData = {
+              planetId: arrival.targetPlanetId,
+              mission: arrival.mission,
+              winner: combatOutcome.winner,
+              attackerLost: combatOutcome.attackerLost,
+              defenderLost: combatOutcome.defenderLost,
+              loot: combatOutcome.loot,
+            };
+
+            broadcastToPlayer(arrival.ownerId, {
+              type: 'combat_report',
+              data: { ...combatReportData, role: 'attacker' },
+              timestamp: event.timestamp.toISOString(),
+            });
+
+            if (planetState.ownerId && planetState.ownerId !== arrival.ownerId) {
+              broadcastToPlayer(planetState.ownerId, {
+                type: 'combat_report',
+                data: { ...combatReportData, role: 'defender' },
+                timestamp: event.timestamp.toISOString(),
+              });
+            }
+          }
 
           result.fleetArrivals.push({
             fleetId: arrival.fleetId,
@@ -706,16 +855,153 @@ export async function syncPlanet(
             break;
           }
 
-          default:
-            // Attack / invasion / etc. — mark arrived, combat deferred
-            await tx.fleet.update({
-              where: { id: fw.fleetId },
-              data: {
-                targetPlanetId: null,
-                ships: { deleteMany: {} }, // ships consumed in combat
-              },
-            });
+          default: {
+            // Attack / invasion / destroy — combat resolved in resolveFleetArrival
+            const fleet = await tx.fleet.findUnique({ where: { id: fw.fleetId } });
+            if (!fleet) break;
+
+            if (fw.combatOutcome) {
+              const outcome = fw.combatOutcome;
+
+              if (outcome.winner === 'ATTACKER' && outcome.attackersRemaining.length > 0) {
+                // Attacker wins: fleet goes on return course with loot and surviving ships
+                const returnTime = computeReturnTime(fleet.launchedAt, fleet.arrivesAt);
+
+                // Remove all old ships first
+                await tx.fleetShip.deleteMany({ where: { fleetId: fw.fleetId } });
+
+                // Re-create surviving ships
+                for (const ship of outcome.attackersRemaining) {
+                  await tx.fleetShip.create({
+                    data: { fleetId: fw.fleetId, type: ship.type, count: ship.count },
+                  });
+                }
+
+                // Update fleet: set return course with loot
+                await tx.fleet.update({
+                  where: { id: fw.fleetId },
+                  data: {
+                    targetPlanetId: null,
+                    iron: outcome.loot.iron,
+                    silver: outcome.loot.silver,
+                    ember: outcome.loot.ember,
+                    h2: outcome.loot.h2,
+                    energy: outcome.loot.energy,
+                    returnsAt: returnTime,
+                  },
+                });
+
+                // Create combat report for attacker
+                await tx.combatReport.create({
+                  data: {
+                    attackerId: fw.ownerId,
+                    defenderId: planet.ownerId ?? 'unknown',
+                    planetId: planet.id,
+                    mission: fw.mission,
+                    winner: outcome.winner,
+                    attackerShips: {
+                      sent: fw.remainingShips,
+                      lost: outcome.attackerLost,
+                      remaining: outcome.attackersRemaining,
+                    },
+                    defenderShips: {
+                      lost: outcome.defenderLost,
+                      remaining: outcome.defendersRemaining,
+                    },
+                    loot: outcome.loot,
+                    fuelCost: fleet.h2 * 2,
+                  },
+                });
+
+                // Create combat report for defender (if planet has an owner)
+                if (planet.ownerId && planet.ownerId !== fw.ownerId) {
+                  await tx.combatReport.create({
+                    data: {
+                      attackerId: fw.ownerId,
+                      defenderId: planet.ownerId,
+                      planetId: planet.id,
+                      mission: fw.mission,
+                      winner: outcome.winner,
+                      attackerShips: {
+                        sent: fw.remainingShips,
+                        lost: outcome.attackerLost,
+                        remaining: outcome.attackersRemaining,
+                      },
+                      defenderShips: {
+                        lost: outcome.defenderLost,
+                        remaining: outcome.defendersRemaining,
+                      },
+                      loot: outcome.loot,
+                      fuelCost: fleet.h2 * 2,
+                    },
+                  });
+                }
+              } else {
+                // Defender wins or draw: fleet is destroyed
+                await tx.fleet.delete({ where: { id: fw.fleetId } });
+
+                // Create combat report for both sides
+                const reportData = {
+                  attackerId: fw.ownerId,
+                  planetId: planet.id,
+                  mission: fw.mission,
+                  winner: outcome.winner,
+                  attackerShips: {
+                    sent: fw.remainingShips,
+                    lost: outcome.attackerLost,
+                    remaining: outcome.attackersRemaining,
+                  },
+                  defenderShips: {
+                    lost: outcome.defenderLost,
+                    remaining: outcome.defendersRemaining,
+                  },
+                  loot: null,
+                  fuelCost: fleet.h2 * 2,
+                };
+
+                await tx.combatReport.create({
+                  data: {
+                    ...reportData,
+                    defenderId: planet.ownerId ?? 'unknown',
+                  },
+                });
+
+                if (planet.ownerId && planet.ownerId !== fw.ownerId) {
+                  await tx.combatReport.create({
+                    data: {
+                      ...reportData,
+                      defenderId: planet.ownerId,
+                    },
+                  });
+                }
+              }
+            } else {
+              // No combat outcome (shouldn't happen for attack/invasion/destroy, but fallback)
+              await tx.fleet.update({
+                where: { id: fw.fleetId },
+                data: {
+                  targetPlanetId: null,
+                  ships: { deleteMany: {} },
+                },
+              });
+            }
+
+            // Update planet ships to reflect combat losses
+            // First delete all existing planet ships, then recreate from defenderShips
+            await tx.planetShip.deleteMany({ where: { planetId: planet.id } });
+            for (const ship of planetState.defenderShips) {
+              if (ship.count > 0) {
+                await tx.planetShip.create({
+                  data: {
+                    planetId: planet.id,
+                    shipType: ship.type,
+                    count: ship.count,
+                  },
+                });
+              }
+            }
             break;
+          }
         }
       } else if (fw.action === 'complete_return') {
         // Delete the fleet record entirely — ships already returned to planet

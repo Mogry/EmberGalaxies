@@ -68,6 +68,7 @@ model Planet {
 model Player {
   id        String    @id @default(cuid())
   name      String    @unique
+  apiKey    String?   @unique
   isBot     Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -86,8 +87,18 @@ model Building {
   upgradeFinishAt DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  constructionQueue ConstructionQueue[]
 
   @@unique([planetId, type])
+}
+
+model ConstructionQueue {
+  id              String    @id @default(cuid())
+  buildingId      String
+  building        Building  @relation(fields: [buildingId], references: [id])
+  targetLevel     Int
+  upgradeFinishAt DateTime
+  createdAt       DateTime  @default(now())
 }
 
 model Fleet {
@@ -106,7 +117,7 @@ model Fleet {
   energy          Float         @default(0)
   launchedAt      DateTime      @default(now())
   arrivesAt       DateTime
-  returnsAt       DateTime
+  returnsAt       DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   ships           FleetShip[]
@@ -196,6 +207,8 @@ enum FleetMission {
   colonize
   harvest
   espionage
+  invasion
+  destroy
 }
 
 enum ResearchType {

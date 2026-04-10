@@ -24,21 +24,20 @@ function ProtectedRoutes() {
   );
 }
 
-function App() {
+function AuthGate() {
   if (!isLoggedIn()) {
-    return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </BrowserRouter>
-    );
+    return <Navigate to="/login" replace />;
   }
+  return <ProtectedRoutes />;
+}
 
+function App() {
   return (
     <BrowserRouter>
-      <ProtectedRoutes />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<AuthGate />} />
+      </Routes>
     </BrowserRouter>
   );
 }

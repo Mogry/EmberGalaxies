@@ -96,8 +96,13 @@ app.get('/ws', upgradeWebSocket((c) => {
           }));
         }
 
-        // Admin subscription — receives all events across all players
+        // Admin subscription — requires admin API key, receives all events across all players
         if (data.type === 'admin_subscribe') {
+          const adminKey = process.env.ADMIN_API_KEY;
+          if (!adminKey || data.apiKey !== adminKey) {
+            ws.send(JSON.stringify({ type: 'admin_subscribe_denied', timestamp: new Date().toISOString() }));
+            return;
+          }
           addAdminClient(ws);
           ws.send(JSON.stringify({
             type: 'admin_subscribed',

@@ -12,18 +12,16 @@ export function LoginPage() {
     setError('');
 
     try {
-      login(key);
       const res = await fetch('/api/admin/stats', {
         headers: { Authorization: `Bearer ${key}` },
       });
       if (res.ok) {
+        login(key);
         navigate('/');
       } else {
-        localStorage.removeItem('admin_api_key');
         setError('Invalid API key');
       }
     } catch {
-      localStorage.removeItem('admin_api_key');
       setError('Connection failed');
     }
   };

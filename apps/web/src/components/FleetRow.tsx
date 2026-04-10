@@ -28,11 +28,9 @@ export function FleetRow({ fleet }: FleetRowProps) {
       <td className="px-4 py-3 text-xs text-admin-text-dim">
         {isArrived ? 'Arrived' : arrivesAt.toLocaleString()}
       </td>
-      {fleet.returnsAt && (
-        <td className="px-4 py-3 text-xs text-admin-text-dim">
-          {new Date(fleet.returnsAt).toLocaleString()}
-        </td>
-      )}
+      <td className="px-4 py-3 text-xs text-admin-text-dim">
+        {fleet.returnsAt ? new Date(fleet.returnsAt).toLocaleString() : '—'}
+      </td>
     </tr>
   );
 }

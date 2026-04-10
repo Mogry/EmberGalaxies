@@ -14,14 +14,14 @@ export function useAdminWebSocket() {
 
     ws.onopen = () => {
       ws.send(JSON.stringify({ type: 'auth', apiKey }));
-      ws.send(JSON.stringify({ type: 'admin_subscribe' }));
+      ws.send(JSON.stringify({ type: 'admin_subscribe', apiKey }));
       setConnected(true);
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'connected' || data.type === 'auth_ok' || data.type === 'admin_subscribed') return;
+        if (data.type === 'connected' || data.type === 'auth_ok' || data.type === 'admin_subscribed' || data.type === 'admin_subscribe_denied') return;
 
         prependEvent({
           id: data.id ?? crypto.randomUUID(),

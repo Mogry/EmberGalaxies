@@ -4,6 +4,8 @@ import { adminFetch } from '../api/client';
 import { PlanetRow } from '../components/PlanetRow';
 import { FleetRow } from '../components/FleetRow';
 import { ResearchRow } from '../components/ResearchRow';
+import { EventRow } from '../components/EventRow';
+import type { GameEventEntry } from '../stores/adminStore';
 
 interface PlayerDetail {
   id: string;
@@ -16,12 +18,13 @@ interface PlayerDetail {
   research: any[];
 }
 
-type Tab = 'planets' | 'fleets' | 'research';
+type Tab = 'planets' | 'fleets' | 'research' | 'events';
 
 export function PlayerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
   const [tab, setTab] = useState<Tab>('planets');
+  const [events, setEvents] = useState<GameEventEntry[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -31,6 +34,13 @@ export function PlayerDetailPage() {
       .catch((e) => setError(e.message));
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    adminFetch<{ events: GameEventEntry[] }>(`/events?playerId=${id}&limit=50`)
+      .then((r) => setEvents(r.events))
+      .catch(console.error);
+  }, [id]);
+
   if (error) return <div className="text-admin-danger">{error}</div>;
   if (!player) return <div className="text-admin-text-dim">Loading...</div>;
 
@@ -38,6 +48,7 @@ export function PlayerDetailPage() {
     { key: 'planets', label: 'Planets', count: player.planets.length },
     { key: 'fleets', label: 'Fleets', count: player.fleets.length },
     { key: 'research', label: 'Research', count: player.research.length },
+    { key: 'events', label: 'Events', count: events.length },
   ];
 
   return (
@@ -130,6 +141,17 @@ export function PlayerDetailPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === 'events' && (
+        <div className="bg-admin-surface rounded-lg border border-admin-border overflow-hidden">
+          {events.length === 0 && (
+            <div className="px-4 py-6 text-center text-sm text-admin-text-dim">No events found</div>
+          )}
+          {events.map((e) => (
+            <EventRow key={e.id} event={e} />
+          ))}
         </div>
       )}
     </div>

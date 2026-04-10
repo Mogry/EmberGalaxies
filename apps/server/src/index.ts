@@ -34,7 +34,11 @@ app.use('/api/*', heavyRateLimit());
 // Health check (unauthenticated, no rate limit)
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// API-Key authentication — all /api/* routes except /api/health (defined above)
+// Admin API routes — mounted BEFORE player auth so adminAuth handles /api/admin/*
+app.use('/api/admin/*', adminAuth());
+app.route('/api/admin', adminRoutes);
+
+// API-Key authentication — all /api/* routes (admin already handled above)
 app.use('/api/*', apiKeyAuth());
 
 // API Routes
@@ -43,10 +47,6 @@ app.route('/api/fleet', fleetRoutes);
 app.route('/api/building', buildingRoutes);
 app.route('/api/research', researchRoutes);
 app.route('/api/shipyard', shipyardRoutes);
-
-// Admin API routes (separate auth — uses ADMIN_API_KEY, not player apiKey)
-app.use('/api/admin/*', adminAuth());
-app.route('/api/admin', adminRoutes);
 
 // WebSocket for realtime updates
 app.get('/ws', upgradeWebSocket((c) => {

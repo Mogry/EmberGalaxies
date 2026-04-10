@@ -1,13 +1,20 @@
 import { Hono } from 'hono';
 import { prisma } from '../db/client';
 import { processExpiredTimers, touchPlanets } from '../utils/timerCompletion';
+import { logEvent } from '../utils/eventLogger';
 import { DEV_MODE } from '../utils/dev';
 
 export const gameRoutes = new Hono();
 
-// Get full game state for a player
+// Get full game state for a player (PRIVATE — only owner can access)
 gameRoutes.get('/state/:playerId', async (c) => {
   const { playerId } = c.req.param();
+  const authPlayerId = c.get('playerId');
+
+  // Only the owner can access their own state
+  if (authPlayerId !== playerId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   // Process any expired timers before returning state
   await processExpiredTimers();
@@ -63,9 +70,10 @@ gameRoutes.get('/galaxy/:galaxy/system/:system', async (c) => {
   return c.json({ galaxy: { ...dbGalaxy, index: galaxyIndex }, system, planets: system.planets });
 });
 
-// Get planet by ID
+// Get planet by ID (PUBLIC for all, but only owner gets full details)
 gameRoutes.get('/planet/:planetId', async (c) => {
   const { planetId } = c.req.param();
+  const authPlayerId = c.get('playerId');
 
   // Process any expired timers first
   await processExpiredTimers();
@@ -87,6 +95,28 @@ gameRoutes.get('/planet/:planetId', async (c) => {
   // Add galaxyIndex
   const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
   const galaxyIndex = galaxies.findIndex((g) => g.id === planet.system.galaxyId) + 1;
+
+  // Non-owners only see public data (no resources, buildings, ships)
+  if (planet.ownerId !== authPlayerId) {
+    return c.json({
+      id: planet.id,
+      name: planet.name,
+      slot: planet.slot,
+      ownerId: planet.ownerId,
+      owner: planet.owner ? { id: planet.owner.id, name: planet.owner.name } : null,
+      system: {
+        id: planet.system.id,
+        index: planet.system.index,
+        galaxyIndex,
+        star: planet.system.star ? {
+          temperature: planet.system.star.temperature,
+          energyOutput: planet.system.star.energyOutput,
+        } : null,
+      },
+      isPublic: true,
+    });
+  }
+
   const planetWithGalaxy = {
     ...planet,
     system: { ...planet.system, galaxyIndex },
@@ -195,9 +225,15 @@ gameRoutes.post('/player', async (c) => {
   return c.json({ ...player, planets: [completePlanet] }, 201);
 });
 
-// Get all planets for a player
+// Get all planets for a player (PRIVATE — only owner can access)
 gameRoutes.get('/planets/:playerId', async (c) => {
   const { playerId } = c.req.param();
+  const authPlayerId = c.get('playerId');
+
+  // Only the owner can list their planets
+  if (authPlayerId !== playerId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   // Process offline production first so resources are up-to-date
   await processExpiredTimers();
@@ -350,6 +386,8 @@ gameRoutes.post('/planet/:planetId/colonize', async (c) => {
       lastSeen: new Date(),
     },
   });
+
+  await logEvent({ type: 'planet_colonized', playerId: player.id, planetId: colonized.id });
 
   // Create starter buildings
   await prisma.building.createMany({

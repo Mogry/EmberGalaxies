@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import { prisma } from '../db/client';
+import { broadcastToPlayer } from '../websocket/broadcast';
+import { logEvent } from '../utils/eventLogger';
 import {
   calculateDistance,
   calculateFlightTime,
@@ -9,6 +11,7 @@ import {
   canFleetUseDrive,
   SHIP_STATS,
 } from '@ember-galaxies/shared';
+import type { FleetMission, ShipType } from '@ember-galaxies/shared';
 
 export const fleetRoutes = new Hono();
 
@@ -66,8 +69,8 @@ fleetRoutes.post('/launch', async (c) => {
 
   // Verfügbare Antriebe aus Research
   const availableDrives = playerResearch
-    .filter(r => r.level > 0 && r.type.startsWith('drive_'))
-    .map(r => r.type.replace('drive_', '') as any)
+    .filter(r => r.level > 0 && r.type.endsWith('_drive'))
+    .map(r => r.type.replace('_drive', '') as any)
     .filter(Boolean);
 
   // Immer combustion verfügbar wenn nichts anderes geforscht
@@ -87,7 +90,18 @@ fleetRoutes.post('/launch', async (c) => {
 
   const distance = calculateDistance(originCoord, targetCoord);
   const flightType = getFlightType(originCoord, targetCoord);
-  const bestDrive = getBestDrive(drives, flightType);
+
+  // Antriebe die alle Schiffe in der Flotte nutzen können (intersection aller Schiff-Antriebe)
+  const fleetCommonDrives = ships.reduce<DriveType[]>((common, s) => {
+    const stats = SHIP_STATS[s.type as keyof typeof SHIP_STATS];
+    if (common === null) return [...stats.drives];
+    return common.filter(d => stats.drives.includes(d));
+  }, null as DriveType[] | null);
+
+  // Nur Antriebe die Spieler auch geforscht hat
+  const usableDrives = (fleetCommonDrives ?? []).filter(d => drives.includes(d));
+  // Wenn keine gemeinsamen Antriebe gefunden, nutze alle Antriebe die der Spieler hat
+  const bestDrive = getBestDrive(usableDrives.length > 0 ? usableDrives : drives, flightType);
 
   if (!bestDrive) {
     return c.json({
@@ -122,52 +136,83 @@ fleetRoutes.post('/launch', async (c) => {
     return c.json({ error: `Not enough cargo capacity. Have ${totalCargo}, need ${totalResources}` }, 400);
   }
 
+  // HARTE REGEL: H2-Treibstoff muss im Laderaum transportiert werden können
+  // Für attack/transport/espionage/invasion/destroy: Hin+Rückflug → 2x H2-Kosten
+  // Für deployment/colonize: nur Hinflug
+  const isRoundTripMission = ['attack', 'transport', 'espionage', 'invasion', 'destroy'].includes(mission);
+  const totalFuelCost = isRoundTripMission ? h2Cost * 2 : h2Cost;
+  const totalCapacity = ships.reduce((sum, s) => {
+    const stats = SHIP_STATS[s.type as keyof typeof SHIP_STATS];
+    return sum + (stats?.cargo ?? 0) * s.count;
+  }, 0);
+
+  if (totalCapacity < totalFuelCost + totalResources) {
+    return c.json({
+      error: `Not enough cargo capacity for H2 fuel (${totalFuelCost}) and cargo (${totalResources}). Have ${totalCapacity}`,
+    }, 400);
+  }
+
   // Flugzeit
   const flightSeconds = calculateFlightTime(distance, ships, bestDrive, flightType);
   const now = new Date();
   const arrivesAt = new Date(now.getTime() + flightSeconds * 1000);
   const returnsAt = new Date(arrivesAt.getTime() + flightSeconds * 1000);
 
+  // Mission-specific ship requirements
+  if (mission === 'colonize' && !ships.some(s => s.type === 'colonizer')) {
+    return c.json({ error: 'Colonize mission requires a colonizer ship' }, 400);
+  }
+  if (mission === 'destroy' && !ships.some(s => s.type === 'ember_bomb')) {
+    return c.json({ error: 'Destroy mission requires an ember_bomb' }, 400);
+  }
+
   // Transaktion: Schiffe abziehen, H2 abziehen, Flotte erstellen
-  await prisma.$transaction([
+  const fleet = await prisma.$transaction(async (tx) => {
     // Schiffe von Planet abziehen
-    ...ships.map(s =>
-      prisma.planetShip.update({
+    for (const s of ships) {
+      await tx.planetShip.update({
         where: { planetId_shipType: { planetId: originPlanetId, shipType: s.type } },
         data: { count: { decrement: s.count } },
-      })
-    ),
+      });
+    }
     // H2 abziehen
-    prisma.planet.update({
+    await tx.planet.update({
       where: { id: originPlanetId },
       data: { h2: { decrement: h2Cost } },
-    }),
-  ]);
-
-  // Flotte erstellen
-  const fleet = await prisma.fleet.create({
-    data: {
-      ownerId: playerId,
-      originPlanetId,
-      targetPlanetId,
-      mission,
-      iron: resources?.iron ?? 0,
-      silver: resources?.silver ?? 0,
-      ember: resources?.ember ?? 0,
-      h2: resources?.h2 ?? 0,
-      energy: resources?.energy ?? 0,
-      launchedAt: now,
-      arrivesAt,
-      returnsAt,
-      ships: {
-        create: ships.map(s => ({
-          type: s.type,
-          count: s.count,
-        })),
+    });
+    // Flotte erstellen
+    return tx.fleet.create({
+      data: {
+        ownerId: playerId,
+        originPlanetId,
+        targetPlanetId,
+        mission,
+        iron: resources?.iron ?? 0,
+        silver: resources?.silver ?? 0,
+        ember: resources?.ember ?? 0,
+        h2: resources?.h2 ?? 0,
+        energy: resources?.energy ?? 0,
+        launchedAt: now,
+        arrivesAt,
+        returnsAt,
+        ships: {
+          create: ships.map(s => ({
+            type: s.type,
+            count: s.count,
+          })),
+        },
       },
-    },
-    include: { ships: true },
+      include: { ships: true },
+    });
   });
+
+  broadcastToPlayer(playerId, {
+    type: 'fleet_launch',
+    data: { fleetId: fleet.id, arrivesAt: fleet.arrivesAt },
+    timestamp: new Date().toISOString(),
+  });
+
+  await logEvent({ type: 'fleet_launch', playerId, fleetId: fleet.id, data: { mission: mission as string, targetPlanetId } });
 
   return c.json({ fleet, distance, drive: bestDrive, flightSeconds, h2Cost }, 201);
 });
@@ -260,9 +305,14 @@ fleetRoutes.post('/simulate', async (c) => {
   const flightType = getFlightType(originCoord, targetCoord);
 
   // Alle Antriebe durchprobieren
-  const results = (['combustion', 'ion', 'hyper', 'nexus', 'interdim'] as const).map(drive => {
-    const hangarCheck = canFleetUseDrive(ships, drive);
-    if (!hangarCheck.possible) return null;
+  const allDrives = (['combustion', 'ion', 'hyperspace', 'nexus', 'phoenix', 'interdim'] as const);
+  const results = allDrives.map(drive => {
+    // Nur Schiffe prüfen die diesen Antrieb nutzen können
+    const canUse = ships.every(s => {
+      const stats = SHIP_STATS[s.type as keyof typeof SHIP_STATS];
+      return stats.drives.includes(drive);
+    });
+    if (!canUse) return null;
 
     const flightSeconds = calculateFlightTime(distance, ships, drive, flightType);
     const h2Cost = calculateH2Cost(distance, ships, drive, flightType);

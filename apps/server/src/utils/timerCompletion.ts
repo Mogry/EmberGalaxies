@@ -1,7 +1,17 @@
 import { prisma } from '../db/client';
-import { calculateOfflineProduction, calculateCombat, calculateLoot, SHIP_STATS } from '@ember-galaxies/shared';
+import {
+  calculateOfflineProduction,
+  simulateCombat,
+  calculateLoot,
+  SHIP_STATS,
+  calculateDistance,
+  getFlightType,
+  getBestDrive,
+  calculateH2Cost,
+} from '@ember-galaxies/shared';
 import { broadcastToPlayer } from '../websocket/broadcast';
-import type { FleetMission, ShipType } from '@ember-galaxies/shared';
+import { logEvent } from './eventLogger';
+import type { FleetMission, ShipType, Coordinate, DriveType } from '@ember-galaxies/shared';
 
 // =============================================================================
 // Types
@@ -55,6 +65,7 @@ interface FleetArrivalEvent {
     h2: number;
     energy: number;
     ships: Array<{ type: ShipType; count: number }>;
+    originCoord: Coordinate | null;
   };
 }
 
@@ -66,6 +77,11 @@ interface FleetReturnEvent {
     ownerId: string;
     originPlanetId: string;
     ships: Array<{ type: ShipType; count: number }>;
+    iron: number;
+    silver: number;
+    ember: number;
+    h2: number;
+    energy: number;
   };
 }
 
@@ -129,12 +145,44 @@ interface CombatOutcome {
   defendersRemaining: Array<{ type: ShipType; count: number }>;
   attackerLost: Array<{ type: ShipType; count: number }>;
   defenderLost: Array<{ type: ShipType; count: number }>;
+  defendersSent: Array<{ type: ShipType; count: number }>;
   loot: { iron: number; silver: number; ember: number; h2: number; energy: number };
+  returnFuelCost: number;
+  outboundFuelCost: number;
 }
 
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/**
+ * Compute H2 fuel cost for a flight between two coordinates.
+ * Derives the best available drive from the ship composition.
+ */
+function computeFlightFuel(
+  ships: Array<{ type: ShipType; count: number }>,
+  fromCoord: Coordinate,
+  toCoord: Coordinate,
+): number {
+  if (ships.length === 0 || ships.every(s => s.count <= 0)) return 0;
+
+  const distance = calculateDistance(fromCoord, toCoord);
+  const flightType = getFlightType(fromCoord, toCoord);
+
+  // Derive available drives from ship types
+  const driveSet = new Set<string>();
+  for (const ship of ships) {
+    for (const d of SHIP_STATS[ship.type].drives) {
+      driveSet.add(d);
+    }
+  }
+  const availableDrives = [...driveSet] as DriveType[];
+
+  const bestDrive = getBestDrive(availableDrives, flightType);
+  if (!bestDrive) return Infinity; // fleet is stranded (shouldn't happen if they got there)
+
+  return calculateH2Cost(distance, ships, bestDrive, flightType);
+}
 
 /**
  * Compute flight time for return trip (same distance, same drive as outbound).
@@ -158,6 +206,7 @@ function resolveFleetArrival(
   event: FleetArrivalEvent,
   planetState: InMemoryPlanetState,
   fleetShipCounts: Map<string, Map<string, number>>,
+  targetCoord: Coordinate,
 ): CombatOutcome | undefined {
   const { payload } = event;
 
@@ -219,29 +268,25 @@ function resolveFleetArrival(
         armourTech: 0,
       };
 
-      // Run combat
-      const result = calculateCombat(attackerFleet, defenderForces);
+      // Run 6-round deterministic combat
+      const result = simulateCombat(attackerFleet, defenderForces);
 
-      // Calculate total fuel cost for loot calculation
-      // We need the H2 cost for the round trip — estimate from the fleet
-      let totalH2Cost = 0;
-      for (const ship of payload.ships) {
-        const stats = SHIP_STATS[ship.type];
-        totalH2Cost += ship.count * stats.h2Factor;
-      }
-      // Simplified: the actual H2 cost was computed at launch time based on distance & drive.
-      // We use the fleet's carried H2 as a proxy (the fleet already consumed outbound fuel,
-      // but the totalFuelCost field is what matters for the return-fuel reserve).
-      // For now, we estimate totalH2Cost = carried H2 * 2 (round trip assumption).
-      // TODO: Store actual fuel cost on Fleet model for precise calculation.
-      const fuelCostEstimate = payload.h2 * 2;
+      // Compute exact outbound fuel (original fleet: origin → target)
+      const outboundFuelCost = payload.originCoord
+        ? computeFlightFuel(payload.ships, payload.originCoord, targetCoord)
+        : 0;
 
-      // Calculate loot if attacker won
+      // Compute exact return fuel (surviving fleet: target → origin)
+      const returnFuelCost = payload.originCoord
+        ? computeFlightFuel(result.attackersRemaining, targetCoord, payload.originCoord)
+        : 0;
+
+      // Calculate loot if attacker won — exact return fuel reserves cargo space
       let loot = { iron: 0, silver: 0, ember: 0, h2: 0, energy: 0 };
       if (result.winner === 'ATTACKER') {
         loot = calculateLoot(
           result.attackersRemaining,
-          fuelCostEstimate,
+          returnFuelCost,
           {
             iron: planetState.iron,
             silver: planetState.silver,
@@ -274,7 +319,10 @@ function resolveFleetArrival(
         defendersRemaining: result.defendersRemaining,
         attackerLost: result.attackerLost,
         defenderLost: result.defenderLost,
+        defendersSent: defenderShips,
         loot,
+        returnFuelCost,
+        outboundFuelCost,
       };
 
       // Mission-specific post-combat effects
@@ -358,6 +406,7 @@ export async function syncPlanet(
     const planet = await tx.planet.findUnique({
       where: { id: planetId },
       include: {
+        system: { include: { galaxy: true } },
         buildings: true,
         originFleets: { where: { arrivesAt: { lte: currentTime } } },
         targetFleets: { where: { arrivesAt: { lte: currentTime } } },
@@ -422,6 +471,21 @@ export async function syncPlanet(
         const fleetShips = await tx.fleetShip.findMany({
           where: { fleetId: fleet.id },
         });
+
+        // Look up origin planet coordinates for return fuel calculation
+        let originCoord: Coordinate | null = null;
+        const originPlanet = await tx.planet.findUnique({
+          where: { id: fleet.originPlanetId },
+          include: { system: { include: { galaxy: true } } },
+        });
+        if (originPlanet) {
+          originCoord = {
+            galaxyIndex: originPlanet.system.galaxy.index,
+            systemIndex: originPlanet.system.index,
+            slot: originPlanet.slot,
+          };
+        }
+
         events.push({
           type: 'fleet_arrival',
           timestamp: fleet.arrivesAt,
@@ -437,6 +501,7 @@ export async function syncPlanet(
             h2: fleet.h2,
             energy: fleet.energy,
             ships: fleetShips.map(s => ({ type: s.type, count: s.count })),
+            originCoord,
           },
         });
       }
@@ -458,6 +523,11 @@ export async function syncPlanet(
           ownerId: fleet.ownerId,
           originPlanetId: fleet.originPlanetId,
           ships: fleetShips.map(s => ({ type: s.type, count: s.count })),
+          iron: fleet.iron,
+          silver: fleet.silver,
+          ember: fleet.ember,
+          h2: fleet.h2,
+          energy: fleet.energy,
         },
       });
     }
@@ -575,6 +645,7 @@ export async function syncPlanet(
               data: { planetId, buildingType, newLevel: targetLevel, queueId },
               timestamp: event.timestamp.toISOString(),
             });
+            await logEvent({ type: 'building_complete', playerId: planetState.ownerId, planetId, data: { buildingType, newLevel: targetLevel } });
           }
           result.buildingCompletions.push({
             planetId,
@@ -603,6 +674,7 @@ export async function syncPlanet(
               data: { planetId: pId, shipType, count, queueId: shipyardId },
               timestamp: event.timestamp.toISOString(),
             });
+            await logEvent({ type: 'ship_complete', playerId: planetState.ownerId, planetId: pId, data: { shipType, count } });
           }
           result.shipCompletions.push({
             planetId: pId,
@@ -639,6 +711,7 @@ export async function syncPlanet(
               data: { researchType, newLevel: computedLevel },
               timestamp: event.timestamp.toISOString(),
             });
+            await logEvent({ type: 'research_complete', playerId, data: { researchType, newLevel: computedLevel } });
             result.researchCompletions.push({
               playerId,
               researchType,
@@ -652,7 +725,12 @@ export async function syncPlanet(
           const arrival = event.payload;
 
           // Resolve resources, ownership changes, and combat in planet state
-          const combatOutcome = resolveFleetArrival(event, planetState, fleetShipCounts);
+          const targetCoord: Coordinate = {
+            galaxyIndex: planet.system.galaxy.index,
+            systemIndex: planet.system.index,
+            slot: planet.slot,
+          };
+          const combatOutcome = resolveFleetArrival(event, planetState, fleetShipCounts, targetCoord);
 
           // Queue the fleet write (remainingShips derived after resolveFleetArrival mutates fleetShipCounts)
           fleetWrites.push({
@@ -674,6 +752,7 @@ export async function syncPlanet(
             },
             timestamp: event.timestamp.toISOString(),
           });
+          await logEvent({ type: 'fleet_arrival', playerId: arrival.ownerId, fleetId: arrival.fleetId, planetId: arrival.targetPlanetId, data: { mission: arrival.mission, targetPlanetId: arrival.targetPlanetId } });
 
           // Broadcast combat report to both players
           if (combatOutcome) {
@@ -699,6 +778,19 @@ export async function syncPlanet(
                 timestamp: event.timestamp.toISOString(),
               });
             }
+
+            await logEvent({
+              type: 'combat_report',
+              playerId: arrival.ownerId,
+              planetId: arrival.targetPlanetId,
+              fleetId: arrival.fleetId,
+              data: {
+                attackerId: arrival.ownerId,
+                defenderId: planetState.ownerId ?? null,
+                winner: combatOutcome.winner,
+                loot: combatOutcome.loot,
+              },
+            });
           }
 
           result.fleetArrivals.push({
@@ -714,7 +806,6 @@ export async function syncPlanet(
           const ret = event.payload;
 
           // Ships go back to origin planet — update planetShip counts
-          // Note: fleet_return ships come from the event payload directly (the fleet was not yet resolved)
           for (const ship of ret.ships) {
             await tx.planetShip.upsert({
               where: {
@@ -724,6 +815,13 @@ export async function syncPlanet(
               update: { count: { increment: ship.count } },
             });
           }
+
+          // Deposit cargo resources on origin planet (in-memory for final update)
+          planetState.iron += ret.iron;
+          planetState.silver += ret.silver;
+          planetState.ember += ret.ember;
+          planetState.h2 += ret.h2;
+          planetState.energy += ret.energy;
 
           // Queue the fleet write
           fleetWrites.push({
@@ -740,6 +838,7 @@ export async function syncPlanet(
             data: { fleetId: ret.fleetId, originPlanetId: ret.originPlanetId },
             timestamp: event.timestamp.toISOString(),
           });
+          await logEvent({ type: 'fleet_return', playerId: ret.ownerId, fleetId: ret.fleetId });
           break;
         }
       }
@@ -905,11 +1004,12 @@ export async function syncPlanet(
                       remaining: outcome.attackersRemaining,
                     },
                     defenderShips: {
+                      sent: outcome.defendersSent,
                       lost: outcome.defenderLost,
                       remaining: outcome.defendersRemaining,
                     },
                     loot: outcome.loot,
-                    fuelCost: fleet.h2 * 2,
+                    fuelCost: outcome.outboundFuelCost + outcome.returnFuelCost,
                   },
                 });
 
@@ -928,11 +1028,12 @@ export async function syncPlanet(
                         remaining: outcome.attackersRemaining,
                       },
                       defenderShips: {
+                        sent: outcome.defendersSent,
                         lost: outcome.defenderLost,
                         remaining: outcome.defendersRemaining,
                       },
                       loot: outcome.loot,
-                      fuelCost: fleet.h2 * 2,
+                      fuelCost: outcome.outboundFuelCost + outcome.returnFuelCost,
                     },
                   });
                 }
@@ -952,11 +1053,12 @@ export async function syncPlanet(
                     remaining: outcome.attackersRemaining,
                   },
                   defenderShips: {
+                    sent: outcome.defendersSent,
                     lost: outcome.defenderLost,
                     remaining: outcome.defendersRemaining,
                   },
                   loot: null,
-                  fuelCost: fleet.h2 * 2,
+                  fuelCost: outcome.outboundFuelCost + outcome.returnFuelCost,
                 };
 
                 await tx.combatReport.create({
@@ -1110,6 +1212,7 @@ export async function processExpiredTimers(): Promise<CompletedResult> {
         data: { researchType: research.type, newLevel },
         timestamp: now.toISOString(),
       });
+      await logEvent({ type: 'research_complete', playerId, data: { researchType: research.type, newLevel } });
       result.researchCompletions.push({ playerId, researchType: research.type, newLevel });
     }
   }

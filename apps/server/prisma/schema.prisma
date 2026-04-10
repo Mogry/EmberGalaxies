@@ -79,6 +79,7 @@ model Player {
   research        Research[]
   attackerReports CombatReport[] @relation("AttackerReports")
   defenderReports CombatReport[] @relation("DefenderReports")
+  events         GameEvent[]
 }
 
 model Building {
@@ -191,6 +192,21 @@ model CombatReport {
   createdAt       DateTime @default(now())
 }
 
+model GameEvent {
+  id         String       @id @default(cuid())
+  type       GameEventType
+  playerId   String?
+  player     Player?      @relation(fields: [playerId], references: [id])
+  planetId   String?
+  fleetId    String?
+  data       Json         @default("{}")
+  createdAt  DateTime     @default(now())
+
+  @@index([type])
+  @@index([playerId])
+  @@index([createdAt])
+}
+
 enum BuildingType {
   zentrale
   iron_mine        // Iron mine
@@ -219,6 +235,17 @@ enum ShipType {
   colonizer
   invasion_unit
   ember_bomb
+}
+
+enum GameEventType {
+  building_complete
+  ship_complete
+  research_complete
+  fleet_launch
+  fleet_arrival
+  fleet_return
+  combat_report
+  planet_colonized
 }
 
 enum FleetMission {

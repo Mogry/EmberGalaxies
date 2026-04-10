@@ -1,45 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-family-mono: "Press Start 2P", "VT323", "Courier New", Courier, monospace;
+  --font-family-sans: "Inter", "SF Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-family-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
 
-  --color-amber-100: #ffb000;
-  --color-amber-200: #ff9900;
-  --color-amber-300: #ff8800;
-  --color-amber-400: #ff7700;
-  --color-amber-500: #ff6600;
-  --color-amber-glow: #ff7700;
+  --color-admin-bg: #0f1117;
+  --color-admin-surface: #1a1d27;
+  --color-admin-surface-hover: #242837;
+  --color-admin-border: #2a2e3d;
+  --color-admin-border-hover: #3a3f52;
 
-  --color-terminal-bg: #0a0a0a;
-  --color-terminal-bg-alt: #0f0f0f;
-  --color-terminal-fg: #ffb000;
-  --color-terminal-dim: #cc8800;
+  --color-admin-text: #e4e4e7;
+  --color-admin-text-dim: #8b8d97;
+  --color-admin-text-bright: #ffffff;
 
-  --color-ember-50: #fff7ed;
-  --color-ember-100: #ffedd5;
-  --color-ember-200: #fed7aa;
-  --color-ember-300: #fdba74;
-  --color-ember-400: #fb923c;
-  --color-ember-500: #f97316;
-  --color-ember-600: #ea580c;
-  --color-ember-700: #c2410c;
-  --color-ember-800: #9a3412;
-  --color-ember-900: #7c2d12;
-
-  --color-galaxy-dark: #0a0a1a;
-  --color-galaxy-darker: #050510;
-  --color-galaxy-purple: #1a1a3a;
-  --color-galaxy-blue: #0d1b2a;
-
-  --color-stars: radial-gradient(circle at center, #1a1a3a 0%, #050510 100%);
-  --color-terminal-grid: linear-gradient(rgba(255, 119, 0, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 119, 0, 0.03) 1px, transparent 1px);
+  --color-admin-accent: #6366f1;
+  --color-admin-accent-hover: #818cf8;
+  --color-admin-success: #22c55e;
+  --color-admin-warning: #f59e0b;
+  --color-admin-danger: #ef4444;
+  --color-admin-info: #3b82f6;
 }
 
 body {
   margin: 0;
-  font-family: 'VT323', monospace;
-  background-color: #0a0a0a;
-  color: #ffb000;
-  font-size: 18px;
+  font-family: var(--font-family-sans);
+  background-color: var(--color-admin-bg);
+  color: var(--color-admin-text);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-admin-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-admin-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-admin-border-hover);
 }

@@ -121,6 +121,40 @@ adminRoutes.get('/events', async (c) => {
   return c.json({ events, nextCursor });
 });
 
+// GET /api/admin/galaxies — All galaxies overview (bulk, for map page)
+adminRoutes.get('/galaxies', async (c) => {
+  const galaxies = await prisma.galaxy.findMany({
+    orderBy: { createdAt: 'asc' },
+    include: {
+      systems: {
+        include: {
+          planets: {
+            include: { owner: { select: { id: true, name: true } } },
+          },
+        },
+      },
+    },
+  });
+
+  const result = galaxies.map((g, i) => {
+    const totalPlanets = g.systems.reduce((sum, s) => sum + s.planets.length, 0);
+    const occupiedPlanets = g.systems.reduce((sum, s) => sum + s.planets.filter((p) => p.ownerId).length, 0);
+    const allOwners = g.systems.flatMap((s) => s.planets.filter((p) => p.owner).map((p) => p.owner!));
+    const uniqueOwners = [...new Map(allOwners.map((o) => [o.id, o])).values()];
+
+    return {
+      index: i + 1,
+      name: g.name,
+      systemCount: g.systems.length,
+      totalPlanets,
+      occupiedPlanets,
+      owners: uniqueOwners,
+    };
+  });
+
+  return c.json(result);
+});
+
 // GET /api/admin/galaxy/:id — Galaxy overview with occupancy
 adminRoutes.get('/galaxy/:id', async (c) => {
   const galaxyIndex = parseInt(c.req.param('id'));

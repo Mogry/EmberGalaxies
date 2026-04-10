@@ -7,6 +7,7 @@ interface GalaxySummary {
   systemCount: number;
   totalPlanets: number;
   occupiedPlanets: number;
+  owners: { id: string; name: string }[];
 }
 
 interface SystemSummary {
@@ -24,13 +25,9 @@ export function GalaxyPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all(
-      Array.from({ length: 100 }, (_, i) =>
-        adminFetch<GalaxySummary>(`/galaxy/${i + 1}`).catch(() => null)
-      )
-    ).then((results) => {
-      setGalaxies(results.filter(Boolean) as GalaxySummary[]);
-    });
+    adminFetch<GalaxySummary[]>('/galaxies')
+      .then(setGalaxies)
+      .catch(console.error);
   }, []);
 
   const selectGalaxy = async (index: number) => {
@@ -59,7 +56,7 @@ export function GalaxyPage() {
                 ? 'border-admin-accent bg-admin-accent/10 text-admin-accent'
                 : 'border-admin-border text-admin-text-dim hover:border-admin-border-hover hover:text-admin-text'
             }`}
-            title={`${g.name}: ${g.occupiedPlanets}/${g.totalPlanets} planets`}
+            title={`${g.name}: ${g.occupiedPlanets}/${g.totalPlanets} planets${g.owners.length > 0 ? ` — ${g.owners.map(o => o.name).join(', ')}` : ''}`}
           >
             {g.index}
           </button>

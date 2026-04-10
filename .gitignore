@@ -37,5 +37,10 @@ bun.lockb
 # Test coverage
 coverage/
 
+# VitePress
+docs-site/node_modules/
+docs-site/.vitepress/cache/
+docs-site/.vitepress/dist/
+
 # Misc
 *.tgz

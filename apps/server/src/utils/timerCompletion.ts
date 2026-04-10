@@ -9,7 +9,7 @@ import {
   getBestDrive,
   calculateH2Cost,
 } from '@ember-galaxies/shared';
-import { broadcastToPlayer } from '../websocket/broadcast';
+import { broadcastToPlayer, broadcastToAdmins } from '../websocket/broadcast';
 import { logEvent } from './eventLogger';
 import type { FleetMission, ShipType, Coordinate, DriveType } from '@ember-galaxies/shared';
 
@@ -640,11 +640,13 @@ export async function syncPlanet(
           await tx.constructionQueue.delete({ where: { id: queueId } });
           // Broadcast
           if (planetState.ownerId) {
-            broadcastToPlayer(planetState.ownerId, {
-              type: 'building_complete',
+            const buildingEvent = {
+              type: 'building_complete' as const,
               data: { planetId, buildingType, newLevel: targetLevel, queueId },
               timestamp: event.timestamp.toISOString(),
-            });
+            };
+            broadcastToPlayer(planetState.ownerId, buildingEvent);
+            broadcastToAdmins(buildingEvent);
             await logEvent({ type: 'building_complete', playerId: planetState.ownerId, planetId, data: { buildingType, newLevel: targetLevel } });
           }
           result.buildingCompletions.push({
@@ -669,11 +671,13 @@ export async function syncPlanet(
           await tx.shipyard.delete({ where: { id: shipyardId } });
           // Broadcast
           if (planetState.ownerId) {
-            broadcastToPlayer(planetState.ownerId, {
-              type: 'ship_complete',
+            const shipEvent = {
+              type: 'ship_complete' as const,
               data: { planetId: pId, shipType, count, queueId: shipyardId },
               timestamp: event.timestamp.toISOString(),
-            });
+            };
+            broadcastToPlayer(planetState.ownerId, shipEvent);
+            broadcastToAdmins(shipEvent);
             await logEvent({ type: 'ship_complete', playerId: planetState.ownerId, planetId: pId, data: { shipType, count } });
           }
           result.shipCompletions.push({
@@ -706,11 +710,13 @@ export async function syncPlanet(
                 researchFinishAt: null,
               },
             });
-            broadcastToPlayer(playerId, {
-              type: 'research_complete',
+            const researchEvent = {
+              type: 'research_complete' as const,
               data: { researchType, newLevel: computedLevel },
               timestamp: event.timestamp.toISOString(),
-            });
+            };
+            broadcastToPlayer(playerId, researchEvent);
+            broadcastToAdmins(researchEvent);
             await logEvent({ type: 'research_complete', playerId, data: { researchType, newLevel: computedLevel } });
             result.researchCompletions.push({
               playerId,
@@ -743,15 +749,17 @@ export async function syncPlanet(
           });
 
           // Broadcast fleet arrival
-          broadcastToPlayer(arrival.ownerId, {
-            type: 'fleet_arrival',
+          const fleetArrivalEvent = {
+            type: 'fleet_arrival' as const,
             data: {
               fleetId: arrival.fleetId,
               targetPlanetId: arrival.targetPlanetId,
               mission: arrival.mission,
             },
             timestamp: event.timestamp.toISOString(),
-          });
+          };
+          broadcastToPlayer(arrival.ownerId, fleetArrivalEvent);
+          broadcastToAdmins(fleetArrivalEvent);
           await logEvent({ type: 'fleet_arrival', playerId: arrival.ownerId, fleetId: arrival.fleetId, planetId: arrival.targetPlanetId, data: { mission: arrival.mission, targetPlanetId: arrival.targetPlanetId } });
 
           // Broadcast combat report to both players
@@ -765,18 +773,22 @@ export async function syncPlanet(
               loot: combatOutcome.loot,
             };
 
-            broadcastToPlayer(arrival.ownerId, {
-              type: 'combat_report',
+            const attackerCombatEvent = {
+              type: 'combat_report' as const,
               data: { ...combatReportData, role: 'attacker' },
               timestamp: event.timestamp.toISOString(),
-            });
+            };
+            broadcastToPlayer(arrival.ownerId, attackerCombatEvent);
+            broadcastToAdmins(attackerCombatEvent);
 
             if (planetState.ownerId && planetState.ownerId !== arrival.ownerId) {
-              broadcastToPlayer(planetState.ownerId, {
-                type: 'combat_report',
+              const defenderCombatEvent = {
+                type: 'combat_report' as const,
                 data: { ...combatReportData, role: 'defender' },
                 timestamp: event.timestamp.toISOString(),
-              });
+              };
+              broadcastToPlayer(planetState.ownerId, defenderCombatEvent);
+              broadcastToAdmins(defenderCombatEvent);
             }
 
             await logEvent({
@@ -833,11 +845,13 @@ export async function syncPlanet(
           });
 
           // Broadcast
-          broadcastToPlayer(ret.ownerId, {
-            type: 'fleet_return',
+          const fleetReturnEvent = {
+            type: 'fleet_return' as const,
             data: { fleetId: ret.fleetId, originPlanetId: ret.originPlanetId },
             timestamp: event.timestamp.toISOString(),
-          });
+          };
+          broadcastToPlayer(ret.ownerId, fleetReturnEvent);
+          broadcastToAdmins(fleetReturnEvent);
           await logEvent({ type: 'fleet_return', playerId: ret.ownerId, fleetId: ret.fleetId });
           break;
         }
@@ -1207,11 +1221,13 @@ export async function processExpiredTimers(): Promise<CompletedResult> {
           researchFinishAt: null,
         },
       });
-      broadcastToPlayer(playerId, {
-        type: 'research_complete',
+      const researchCompleteEvent = {
+        type: 'research_complete' as const,
         data: { researchType: research.type, newLevel },
         timestamp: now.toISOString(),
-      });
+      };
+      broadcastToPlayer(playerId, researchCompleteEvent);
+      broadcastToAdmins(researchCompleteEvent);
       await logEvent({ type: 'research_complete', playerId, data: { researchType: research.type, newLevel } });
       result.researchCompletions.push({ playerId, researchType: research.type, newLevel });
     }

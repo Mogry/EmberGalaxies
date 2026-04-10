@@ -6,7 +6,11 @@ import { fleetRoutes } from './routes/fleet';
 import { buildingRoutes } from './routes/building';
 import { researchRoutes } from './routes/research';
 import { shipyardRoutes } from './routes/shipyard';
-import { addClient, removeClientFromAll } from './websocket/broadcast';
+import { addClient, removeClientFromAll, addAdminClient, removeAdminClient } from './websocket/broadcast';
+import { prisma } from './db/client';
+import { apiKeyAuth } from './middleware/apiKeyAuth';
+import { adminRoutes } from './routes/admin';
+import { adminAuth } from './middleware/adminAuth';
 import { globalRateLimit, heavyRateLimit } from './middleware/rateLimit';
 
 const { websocket, upgradeWebSocket } = createBunWebSocket();
@@ -30,6 +34,9 @@ app.use('/api/*', heavyRateLimit());
 // Health check (unauthenticated, no rate limit)
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// API-Key authentication — all /api/* routes except /api/health (defined above)
+app.use('/api/*', apiKeyAuth());
+
 // API Routes
 app.route('/api/game', gameRoutes);
 app.route('/api/fleet', fleetRoutes);
@@ -37,19 +44,46 @@ app.route('/api/building', buildingRoutes);
 app.route('/api/research', researchRoutes);
 app.route('/api/shipyard', shipyardRoutes);
 
+// Admin API routes (separate auth — uses ADMIN_API_KEY, not player apiKey)
+app.use('/api/admin/*', adminAuth());
+app.route('/api/admin', adminRoutes);
+
 // WebSocket for realtime updates
 app.get('/ws', upgradeWebSocket((c) => {
   let subscribedPlayerId: string | null = null;
+  let authenticated = false;
+  let playerId: string | null = null;
 
   return {
     onOpen(_event, ws) {
       console.log('WebSocket connected');
       ws.send(JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() }));
     },
-    onMessage(event, ws) {
+    async onMessage(event, ws) {
       try {
         const data = JSON.parse(event.data.toString());
         console.log('Received:', data);
+
+        // Require auth message first
+        if (!authenticated) {
+          if (data.type === 'auth' && data.apiKey) {
+            const player = await prisma.player.findUnique({
+              where: { apiKey: data.apiKey },
+              select: { id: true },
+            });
+            if (player) {
+              authenticated = true;
+              playerId = player.id;
+              ws.send(JSON.stringify({ type: 'auth_ok' }));
+            } else {
+              ws.send(JSON.stringify({ type: 'auth_failed' }));
+              ws.close();
+            }
+          } else {
+            ws.close();
+          }
+          return;
+        }
 
         // Handle subscription to player updates
         if (data.type === 'subscribe' && data.playerId) {
@@ -61,12 +95,22 @@ app.get('/ws', upgradeWebSocket((c) => {
             timestamp: new Date().toISOString()
           }));
         }
+
+        // Admin subscription — receives all events across all players
+        if (data.type === 'admin_subscribe') {
+          addAdminClient(ws);
+          ws.send(JSON.stringify({
+            type: 'admin_subscribed',
+            timestamp: new Date().toISOString()
+          }));
+        }
       } catch (e) {
         console.error('Failed to parse WebSocket message:', e);
       }
     },
     onClose(_event, ws) {
       console.log('WebSocket disconnected');
+      removeAdminClient(ws);
       removeClientFromAll(ws);
     },
   };
@@ -76,9 +120,9 @@ app.get('/ws', upgradeWebSocket((c) => {
 // For Bun server
 export default {
   port: 3000,
-  hostname: 'localhost',
+  hostname: '0.0.0.0',
   fetch: app.fetch,
   websocket,
 };
 
-console.log('🚀 Server running at http://localhost:3000');
+console.log('🚀 Server running at http://0.0.0.0:3000');

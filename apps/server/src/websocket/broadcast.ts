@@ -73,3 +73,32 @@ export function getConnectedClientCount(playerId?: string): number {
   }
   return total;
 }
+
+// Admin WebSocket clients
+const adminClients = new Set<ServerWebSocket>();
+
+export function addAdminClient(ws: ServerWebSocket): void {
+  adminClients.add(ws);
+}
+
+export function removeAdminClient(ws: ServerWebSocket): void {
+  adminClients.delete(ws);
+}
+
+/**
+ * Broadcast an event to all admin dashboard clients
+ */
+export function broadcastToAdmins(event: BroadcastEvent): void {
+  if (adminClients.size === 0) return;
+  const message = JSON.stringify(event);
+  for (const ws of adminClients) {
+    ws.send(message);
+  }
+}
+
+/**
+ * Get count of connected admin clients
+ */
+export function getAdminClientCount(): number {
+  return adminClients.size;
+}

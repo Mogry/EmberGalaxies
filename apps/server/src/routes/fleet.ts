@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { prisma } from '../db/client';
-import { broadcastToPlayer } from '../websocket/broadcast';
+import { broadcastToPlayer, broadcastToAdmins } from '../websocket/broadcast';
 import { logEvent } from '../utils/eventLogger';
 import {
   calculateDistance,
@@ -206,11 +206,13 @@ fleetRoutes.post('/launch', async (c) => {
     });
   });
 
-  broadcastToPlayer(playerId, {
-    type: 'fleet_launch',
+  const fleetLaunchEvent = {
+    type: 'fleet_launch' as const,
     data: { fleetId: fleet.id, arrivesAt: fleet.arrivesAt },
     timestamp: new Date().toISOString(),
-  });
+  };
+  broadcastToPlayer(playerId, fleetLaunchEvent);
+  broadcastToAdmins(fleetLaunchEvent);
 
   await logEvent({ type: 'fleet_launch', playerId, fleetId: fleet.id, data: { mission: mission as string, targetPlanetId } });
 

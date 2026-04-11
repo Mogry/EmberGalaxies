@@ -88,9 +88,13 @@ adminRoutes.get('/players/:id', async (c) => {
   }
 
   // Attach galaxyIndex to each planet
-  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+  const galaxyIds = [...new Set(player.planets.map((p) => p.system.galaxyId))];
+  const galaxyMap = new Map(
+    (await prisma.galaxy.findMany({ where: { id: { in: galaxyIds } }, select: { id: true, index: true } }))
+      .map((g) => [g.id, g.index]),
+  );
   const planetsWithGalaxy = player.planets.map((p) => {
-    const galaxyIndex = galaxies.findIndex((g) => g.id === p.system.galaxyId) + 1;
+    const galaxyIndex = galaxyMap.get(p.system.galaxyId) ?? 0;
     return { ...p, system: { ...p.system, galaxyIndex } };
   });
 
@@ -123,31 +127,58 @@ adminRoutes.get('/events', async (c) => {
 
 // GET /api/admin/galaxies — All galaxies overview (bulk, for map page)
 adminRoutes.get('/galaxies', async (c) => {
-  const galaxies = await prisma.galaxy.findMany({
-    orderBy: { createdAt: 'asc' },
-    include: {
-      systems: {
-        include: {
-          planets: {
-            include: { owner: { select: { id: true, name: true } } },
-          },
-        },
-      },
-    },
-  });
+  // Single raw query — galaxies with system + planet counts
+  const rows = await prisma.$queryRaw<
+    { id: string; index: number; name: string; systemCount: bigint; totalPlanets: bigint; occupiedPlanets: bigint }[]
+  >`
+    SELECT g.id, g.index, g.name,
+           COUNT(DISTINCT s.id) AS "systemCount",
+           COUNT(p.id) AS "totalPlanets",
+           COUNT(p."ownerId") AS "occupiedPlanets"
+    FROM "Galaxy" g
+    JOIN "System" s ON s."galaxyId" = g.id
+    JOIN "Planet" p ON p."systemId" = s.id
+    GROUP BY g.id, g.index, g.name
+    ORDER BY g.index
+  `;
 
-  const result = galaxies.map((g, i) => {
-    const totalPlanets = g.systems.reduce((sum, s) => sum + s.planets.length, 0);
-    const occupiedPlanets = g.systems.reduce((sum, s) => sum + s.planets.filter((p) => p.ownerId).length, 0);
-    const allOwners = g.systems.flatMap((s) => s.planets.filter((p) => p.owner).map((p) => p.owner!));
-    const uniqueOwners = [...new Map(allOwners.map((o) => [o.id, o])).values()];
+  // Owners per galaxy (only occupied — tiny set)
+  const ownerRows = await prisma.$queryRaw<
+    { galaxyId: string; ownerId: string }[]
+  >`
+    SELECT DISTINCT s."galaxyId", p."ownerId"
+    FROM "System" s
+    JOIN "Planet" p ON p."systemId" = s.id AND p."ownerId" IS NOT NULL
+  `;
+  const ownersByGalaxy = new Map<string, string[]>();
+  for (const row of ownerRows) {
+    const arr = ownersByGalaxy.get(row.galaxyId) ?? [];
+    arr.push(row.ownerId);
+    ownersByGalaxy.set(row.galaxyId, arr);
+  }
+
+  const allOwnerIds = [...new Set(ownerRows.map((r) => r.ownerId))].filter(Boolean) as string[];
+  const ownerRecords = allOwnerIds.length > 0
+    ? await prisma.player.findMany({
+        where: { id: { in: allOwnerIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const ownerMap = new Map(ownerRecords.map((o) => [o.id, o]));
+
+  const result = rows.map((g) => {
+    const galaxyKey = String(g.id);
+    const galaxyOwnerIds = ownersByGalaxy.get(galaxyKey) ?? [];
+    const uniqueOwners = galaxyOwnerIds
+      .map((id) => ownerMap.get(id))
+      .filter((o): o is { id: string; name: string } => o !== undefined && o !== null);
 
     return {
-      index: i + 1,
+      index: g.index,
       name: g.name,
-      systemCount: g.systems.length,
-      totalPlanets,
-      occupiedPlanets,
+      systemCount: Number(g.systemCount),
+      totalPlanets: Number(g.totalPlanets),
+      occupiedPlanets: Number(g.occupiedPlanets),
       owners: uniqueOwners,
     };
   });
@@ -159,42 +190,63 @@ adminRoutes.get('/galaxies', async (c) => {
 adminRoutes.get('/galaxy/:id', async (c) => {
   const galaxyIndex = parseInt(c.req.param('id'));
 
-  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
-  const galaxy = galaxies[galaxyIndex - 1];
+  const galaxy = await prisma.galaxy.findFirst({
+    where: { index: galaxyIndex },
+  });
 
   if (!galaxy) {
     return c.json({ error: 'Galaxy not found' }, 404);
   }
 
-  const systems = await prisma.system.findMany({
-    where: { galaxyId: galaxy.id },
-    include: {
-      planets: {
-        include: { owner: { select: { id: true, name: true } } },
-      },
-    },
-    orderBy: { index: 'asc' },
-  });
+  // Aggregate planet stats per system via raw SQL
+  const systemStats = await prisma.$queryRaw<
+    { systemId: string; systemIndex: number; planetCount: bigint; occupiedCount: bigint; ownerIds: string[] }[]
+  >`
+    SELECT
+      s.id AS "systemId",
+      s.index AS "systemIndex",
+      COUNT(p.id) AS "planetCount",
+      COUNT(p."ownerId") AS "occupiedCount",
+      array_agg(DISTINCT p."ownerId") FILTER (WHERE p."ownerId" IS NOT NULL) AS "ownerIds"
+    FROM "System" s
+    JOIN "Planet" p ON p."systemId" = s.id
+    WHERE s."galaxyId" = ${galaxy.id}
+    GROUP BY s.id, s.index
+    ORDER BY s.index
+  `;
 
-  const totalPlanets = systems.reduce((sum, s) => sum + s.planets.length, 0);
-  const occupiedPlanets = systems.reduce(
-    (sum, s) => sum + s.planets.filter((p) => p.ownerId).length,
-    0
-  );
+  const totalPlanets = systemStats.reduce((sum, s) => sum + Number(s.planetCount), 0);
+  const occupiedPlanets = systemStats.reduce((sum, s) => sum + Number(s.occupiedCount), 0);
+
+  // Fetch owner names
+  const allOwnerIds = [...new Set(systemStats.flatMap((s) => s.ownerIds ?? []))];
+  const owners = allOwnerIds.length > 0
+    ? await prisma.player.findMany({
+        where: { id: { in: allOwnerIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const ownerMap = new Map(owners.map((o) => [o.id, o]));
 
   return c.json({
     index: galaxyIndex,
     name: galaxy.name,
-    systemCount: systems.length,
+    systemCount: systemStats.length,
     totalPlanets,
     occupiedPlanets,
-    systems: systems.map((s) => ({
-      id: s.id,
-      index: s.index,
-      planetCount: s.planets.length,
-      occupiedCount: s.planets.filter((p) => p.ownerId).length,
-      owners: [...new Set(s.planets.filter((p) => p.owner).map((p) => p.owner!))],
-    })),
+    systems: systemStats.map((s) => {
+      const sysOwners = (s.ownerIds ?? [])
+        .filter(Boolean)
+        .map((id) => ownerMap.get(id))
+        .filter(Boolean) as { id: string; name: string }[];
+      return {
+        id: s.systemId,
+        index: s.systemIndex,
+        planetCount: Number(s.planetCount),
+        occupiedCount: Number(s.occupiedCount),
+        owners: [...new Map(sysOwners.map((o) => [o.id, o])).values()],
+      };
+    }),
   });
 });
 
@@ -218,8 +270,8 @@ adminRoutes.get('/system/:id', async (c) => {
     return c.json({ error: 'System not found' }, 404);
   }
 
-  const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
-  const galaxyIndex = galaxies.findIndex((g) => g.id === system.galaxyId) + 1;
+  const galaxy = await prisma.galaxy.findUnique({ where: { id: system.galaxyId }, select: { index: true } });
+  const galaxyIndex = galaxy?.index ?? 0;
 
   return c.json({ ...system, galaxyIndex });
 });

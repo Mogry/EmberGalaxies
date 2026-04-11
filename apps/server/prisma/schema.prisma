@@ -53,8 +53,6 @@ model Planet {
   h2          Float     @default(0)
   energy      Float     @default(0)
   lastSeen    DateTime  @default(now()) // Last time player viewed this planet (for offline production)
-  fieldsUsed  Int       @default(0)
-  fieldsMax   Int       @default(163)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   buildings   Building[]

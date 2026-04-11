@@ -5,7 +5,7 @@
  * every command has a cooldown cost enforced by these limits.
  *
  * - Global: 60 req/min per user (identified by playerId or IP)
- * - Heavy Actions: 5 req/min (fleet/launch, building/upgrade, research/start, shipyard/build)
+ * - Heavy Actions: 20 req/min (fleet/launch, building/upgrade, research/start, shipyard/build)
  */
 
 import type { Context, Next } from 'hono';
@@ -16,7 +16,7 @@ import type { Env, MiddlewareHandler } from 'hono';
 export const GLOBAL_LIMIT = 60;       // requests per window
 export const GLOBAL_WINDOW_MS = 60_000; // 1 minute in ms
 
-export const HEAVY_LIMIT = 5;         // requests per window
+export const HEAVY_LIMIT = 20;        // requests per window
 export const HEAVY_WINDOW_MS = 60_000; // 1 minute in ms
 
 // Endpoints that count as "Heavy Actions"

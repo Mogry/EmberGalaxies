@@ -7,6 +7,7 @@ import { GalaxyPage } from './pages/GalaxyPage';
 import { EventsPage } from './pages/EventsPage';
 import { PlayersPage } from './pages/PlayersPage';
 import { PlayerDetailPage } from './pages/PlayerDetailPage';
+import { SystemPage } from './pages/SystemPage';
 import { useAdminWebSocket } from './hooks/useAdminWebSocket';
 
 function ProtectedRoutes() {
@@ -19,6 +20,7 @@ function ProtectedRoutes() {
         <Route path="events" element={<EventsPage />} />
         <Route path="players" element={<PlayersPage />} />
         <Route path="players/:id" element={<PlayerDetailPage />} />
+        <Route path="system/:id" element={<SystemPage />} />
       </Route>
     </Routes>
   );

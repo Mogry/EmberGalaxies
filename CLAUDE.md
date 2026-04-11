@@ -4,8 +4,9 @@
 
 Ember Galaxies ist ein Galaxy-Conquest-MMO, in dem nicht Menschen klicken, sondern **LLM-Agenten programmiert werden**. Spieler sind Architekten und Strategen, die ihre Agenten-Armeen über eine API steuern, während sie das Geschehen über ein Read-Only Dashboard überwachen.
 
-**Aktueller Stand:** Single-Player Browser-Game (Phase 1)
+**Aktueller Stand:** Phase 2 abgeschlossen — Kampfsystem, Flotten, Lazy Evaluation
 **Ziel:** KI-Arena mit MCP Server (Phase 3+)
+**Testspieler:** Pi (`pi-1775918260629`), Admin-Key: `ember-admin-2026`
 
 ---
 
@@ -29,7 +30,7 @@ Das Universum ist **linear aufgebaut** für natürliche Progression und Neulings
 | Layer | Tech |
 |-------|------|
 | Backend | Bun/Node.js (High-Performance WebSockets & API) |
-| Database | Postgres (Lazy Evaluation via Timestamps für alle Timer) |
+| Database | Postgres 16 (lokal via Homebrew, VPS via Docker) |
 | Frontend | Vite + React (nur Admin-Tool / Read-Only Dashboard) |
 | Infra | Docker-Container auf Hostinger VPS, Tailscale |
 | Bridge | MCP Server (Model Context Protocol) |
@@ -81,6 +82,15 @@ Konstanten: PLANET_STEP_DIST=5, EXIT_SYSTEM_COST=100, SYSTEM_STEP_DOST=20, EXIT_
 ### Ressourcen auf Planet
 Ressourcen (iron, silver, ember, h2, energy) liegen direkt auf dem `Planet`-Model.
 
+### Kampfsystem (6-Runden deterministisch)
+- **`simulateCombat(attacker, defender, maxRounds=6)`** in `packages/shared/src/combat.ts`
+- Beide Seiten feuern gleichzeitig mit aktueller Angriffsstärke
+- Schaden proportional nach HP-Pool-Größe verteilt
+- Tech-Boni: weapons/shield/armour (+5% pro Level)
+- Beute: `availableLootSpace = totalCargo - returnFuelCost`, proportionale Verteilung
+- Return-Fuel: Exakt berechnet aus überlebender Flotte + Perlenschnur-Distanz + bester Antrieb
+- `CombatReport` in DB mit sent/lost/remaining für beide Seiten
+
 ---
 
 ## Logik-Ebenen (Hybrid-Modell)
@@ -98,8 +108,8 @@ Defense               → Automatisierte "Heartbeat"-Checks alle X Minuten
 
 ## Phasen Roadmap
 
-1. **Phase 1:** Single-Player API (Gebäude/Schiffe bauen) — **Aktueller Stand**
-2. **Phase 2:** Flotten-Logik & Distanz-Mathematik (Lazy Evaluation via Timestamps)
+1. **Phase 1:** Single-Player API (Gebäude/Schiffe bauen) — ✅ Abgeschlossen
+2. **Phase 2:** Flotten-Logik & Kampfsystem — ✅ Abgeschlossen
 3. **Phase 3:** MCP-Bridge & Multi-Agent-Sandbox (ThinkCentre Testumgebung)
 4. **Phase 4:** Read-Only Commander Dashboard (Vite)
 5. **Phase 5:** Migration-Features, Versiegende Ressourcen
@@ -198,8 +208,24 @@ npm run dev:server   # Nur Backend (Port 3000)
 npm run dev:web      # Nur Frontend (Port 5173)
 npm run db:studio    # Prisma Studio
 npm run db:migrate   # Migrationen
-docker-compose up -d # Postgres starten
+brew services start postgresql@16   # Postgres starten (lokal)
+brew services stop postgresql@16    # Postgres stoppen (lokal)
+# VPS: docker-compose up -d (Docker nur fürs Deployment)
 ```
+
+---
+
+## WICHTIG: Lokale Entwicklung ohne Docker
+
+**Lokal läuft Postgres nativ via Homebrew, NICHT in Docker.** Docker Desktop ist auf diesem Mac instabil und wird nicht für lokale Entwicklung verwendet.
+
+- Postgres 16 läuft als Brew-Service auf `localhost:5432`
+- Starten: `brew services start postgresql@16`
+- Stoppen: `brew services stop postgresql@16`
+- Status: `brew services info postgresql@16`
+- DB-Name: `ember_galaxies`, User: `ember`, Password: `galaxies`
+- Docker (`docker-compose up -d`) wird NUR auf dem VPS verwendet
+- Wenn Postgres nicht erreichbar ist: `brew services restart postgresql@16`, NICHT Docker starten
 
 ---
 

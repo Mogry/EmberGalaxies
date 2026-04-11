@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { adminFetch } from '../api/client';
 
 interface GalaxySummary {
@@ -19,6 +20,7 @@ interface SystemSummary {
 }
 
 export function GalaxyPage() {
+  const navigate = useNavigate();
   const [galaxies, setGalaxies] = useState<GalaxySummary[]>([]);
   const [selectedGalaxy, setSelectedGalaxy] = useState<number | null>(null);
   const [systems, setSystems] = useState<SystemSummary[]>([]);
@@ -56,7 +58,7 @@ export function GalaxyPage() {
                 ? 'border-admin-accent bg-admin-accent/10 text-admin-accent'
                 : 'border-admin-border text-admin-text-dim hover:border-admin-border-hover hover:text-admin-text'
             }`}
-            title={`${g.name}: ${g.occupiedPlanets}/${g.totalPlanets} planets${g.owners.length > 0 ? ` — ${g.owners.map(o => o.name).join(', ')}` : ''}`}
+            title={`${g.name}: ${g.occupiedPlanets}/${g.totalPlanets} planets${g.owners.length > 0 ? ` — ${g.owners.filter(Boolean).map(o => o.name).join(', ')}` : ''}`}
           >
             {g.index}
           </button>
@@ -81,12 +83,16 @@ export function GalaxyPage() {
                 </thead>
                 <tbody>
                   {systems.map((s) => (
-                    <tr key={s.id} className="border-b border-admin-border hover:bg-admin-surface-hover">
-                      <td className="px-4 py-2 text-sm text-admin-text">S{s.index}</td>
+                    <tr
+                      key={s.id}
+                      className="border-b border-admin-border hover:bg-admin-surface-hover cursor-pointer"
+                      onClick={() => navigate(`/system/${s.id}`)}
+                    >
+                      <td className="px-4 py-2 text-sm text-admin-text">S{String(s.index).padStart(3, '0')}</td>
                       <td className="px-4 py-2 text-xs text-admin-text-dim">{s.planetCount}</td>
                       <td className="px-4 py-2 text-xs text-admin-text">{s.occupiedCount}</td>
                       <td className="px-4 py-2 text-xs text-admin-text-dim">
-                        {s.owners.map((o) => o.name).join(', ') || '—'}
+                        {s.owners.filter(Boolean).map((o) => o.name).join(', ') || '—'}
                       </td>
                     </tr>
                   ))}

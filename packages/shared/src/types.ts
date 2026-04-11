@@ -44,8 +44,6 @@ export interface Planet {
   h2: number;
   energy: number;
   lastSeen: Date;
-  fieldsUsed: number;
-  fieldsMax: number;
   createdAt: Date;
   updatedAt: Date;
   system?: System;
@@ -105,6 +103,9 @@ export interface ShipStats {
   defense: number;
   cargo: number;
   drives: DriveType[];
+  speed: number;
+  h2Factor: number;
+  hangarCapacity: number;
   buildTimeSeconds: number;
   description: string;
   className: string;
@@ -123,7 +124,9 @@ export type FleetMission =
   | 'deployment'
   | 'colonize'
   | 'harvest'
-  | 'espionage';
+  | 'espionage'
+  | 'invasion'
+  | 'destroy';
 
 export interface Fleet {
   id: string;
@@ -198,6 +201,7 @@ export type GameEventType =
   | 'research_complete'
   | 'fleet_arrival'
   | 'fleet_return'
+  | 'fleet_launch'
   | 'attack'
   | 'combat_report';
 

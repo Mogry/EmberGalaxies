@@ -33,16 +33,18 @@ describe('calculateCombat', () => {
     expect(result.defendersRemaining.length).toBeGreaterThan(0);
   });
 
-  test('draw when both sides have ships remaining', () => {
-    // Two equal fleets should both take damage but likely both survive
+  test('draw with identical fleets — mutual annihilation over 6 rounds', () => {
+    // Two identical fleets fight 6 rounds. With proportional damage,
+    // equal fleets converge to mutual destruction.
     const fleet = { ships: [{ type: 'corvette' as const, count: 100 }] };
 
     const result = calculateCombat(fleet, fleet);
 
-    // With identical fleets, both fire same damage. Both should lose ships but both survive.
+    // Both sides deal identical damage each round → DRAW
     expect(result.winner).toBe('DRAW');
-    expect(result.attackersRemaining.length).toBeGreaterThan(0);
-    expect(result.defendersRemaining.length).toBeGreaterThan(0);
+    // After 6 rounds of proportional damage, both sides are typically destroyed
+    expect(result.attackerLost.length).toBeGreaterThan(0);
+    expect(result.defenderLost.length).toBeGreaterThan(0);
   });
 
   test('mutual annihilation when damage exceeds all HP', () => {
@@ -226,26 +228,26 @@ describe('calculateCombat', () => {
 describe('calculateLoot', () => {
   test('loot capacity is reduced by return fuel reserve', () => {
     // 10 corvettes: cargo = 300 each = 3000 total
-    // Total fuel cost = 2000 (so return reserve = 1000)
-    // Available loot space = 3000 - 1000 = 2000
+    // Return fuel cost = 2000 (exact, not heuristic)
+    // Available loot space = 3000 - 2000 = 1000
 
     const result = calculateLoot(
       [{ type: 'corvette' as const, count: 10 }],
-      2000, // total fuel cost
+      2000, // exact return fuel cost
       { iron: 5000, silver: 5000, ember: 5000, h2: 5000, energy: 5000 },
     );
 
-    // Total loot should not exceed 2000
+    // Total loot should not exceed 1000 (available cargo space after fuel reserve)
     const totalLoot = result.iron + result.silver + result.ember + result.h2 + result.energy;
-    expect(totalLoot).toBeLessThanOrEqual(2000);
+    expect(totalLoot).toBeLessThanOrEqual(1000);
     expect(totalLoot).toBeGreaterThan(0);
   });
 
   test('no loot when capacity equals fuel reserve', () => {
-    // If capacity exactly equals return fuel reserve, no space for loot
+    // If capacity exactly equals return fuel cost, no space for loot
     const result = calculateLoot(
       [{ type: 'fly' as const, count: 10 }], // cargo = 50 each = 500 total
-      1000, // total fuel cost, return reserve = 500
+      500, // exact return fuel cost = capacity, so 0 space for loot
       // availableLootSpace = 500 - 500 = 0
       { iron: 10000, silver: 0, ember: 0, h2: 0, energy: 0 },
     );
@@ -293,7 +295,7 @@ describe('calculateLoot', () => {
     expect(result.energy).toBe(5000);
   });
 
-  test('loot fills cargo until full, prioritizing earlier resources', () => {
+  test('loot is distributed proportionally when capacity is limited', () => {
     // 5 corvettes: cargo = 300 each = 1500 total, no fuel cost
     const result = calculateLoot(
       [{ type: 'corvette' as const, count: 5 }],
@@ -303,17 +305,18 @@ describe('calculateLoot', () => {
     );
 
     // Lootable: iron=5000, silver=5000, ember=5000, total=15000
-    // Capacity = 1500
-    // Iron takes 1500 (fills all capacity)
-    expect(result.iron).toBe(1500);
-    expect(result.silver).toBe(0);
-    expect(result.ember).toBe(0);
+    // Capacity = 1500 < 15000 → proportional fill
+    // fillRatio = 1500 / 15000 = 0.1
+    // Each resource gets floor(5000 * 0.1) = 500
+    expect(result.iron).toBe(500);
+    expect(result.silver).toBe(500);
+    expect(result.ember).toBe(500);
   });
 
-  test('return fuel reserve correctly reduces loot space', () => {
+  test('return fuel cost correctly reduces loot space', () => {
     // Scenario: 10 battleships (cargo=2500 each = 25000 total)
-    // Fuel cost = 10000, so return reserve = 5000
-    // Available loot = 25000 - 5000 = 20000
+    // Return fuel cost = 10000 (exact)
+    // Available loot = 25000 - 10000 = 15000
     const result = calculateLoot(
       [{ type: 'battleship' as const, count: 10 }],
       10000,
@@ -321,8 +324,8 @@ describe('calculateLoot', () => {
       0.5,
     );
 
-    // 50% of 100000 = 50000, but capacity is only 20000
-    expect(result.iron).toBe(20000);
+    // 50% of 100000 = 50000, but capacity is only 15000
+    expect(result.iron).toBe(15000);
   });
 
   test('custom loot factor', () => {

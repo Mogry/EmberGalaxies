@@ -79,19 +79,19 @@ export const SHIP_DESCRIPTIONS: Record<ShipType, string> = {
   ember_bomb: 'Blasts enemy planets completely out of the game.',
 };
 
-export const SHIP_STATS: Record<ShipType, { attack: number; defense: number; cargo: number; drives: DriveType[] }> = {
-  fly:           { attack: 5,   defense: 10,  cargo: 50,  drives: ['combustion'] },
-  bumblebee:     { attack: 20,  defense: 25,  cargo: 100, drives: ['combustion'] },
-  corvette:      { attack: 50,  defense: 60,  cargo: 300, drives: ['combustion', 'impulse'] },
-  light_cruiser: { attack: 150, defense: 130, cargo: 800, drives: ['combustion', 'impulse'] },
-  heavy_cruiser: { attack: 300, defense: 250, cargo: 1500, drives: ['combustion', 'impulse'] },
-  battleship:    { attack: 600, defense: 500, cargo: 2500, drives: ['combustion', 'impulse', 'hyperspace'] },
-  battleship_nexus: { attack: 1500, defense: 1200, cargo: 5000, drives: ['combustion', 'impulse', 'hyperspace', 'nexus'] },
-  battleship_phoenix: { attack: 4000, defense: 3000, cargo: 10000, drives: ['combustion', 'impulse', 'hyperspace', 'nexus', 'phoenix'] },
-  carrier_titan: { attack: 200, defense: 800, cargo: 50000, drives: ['hyperspace'] },
-  colonizer:     { attack: 0,   defense: 100, cargo: 7500, drives: ['hyperspace'] },
-  invasion_unit: { attack: 800, defense: 600, cargo: 2000, drives: ['hyperspace'] },
-  ember_bomb:    { attack: 0,   defense: 0,   cargo: 0,   drives: ['hyperspace'] },
+export const SHIP_STATS: Record<ShipType, { attack: number; defense: number; cargo: number; drives: DriveType[]; speed: number; h2Factor: number; hangarCapacity: number }> = {
+  fly:             { attack: 5,    defense: 10,  cargo: 50,    drives: ['combustion'],         speed: 1.0,  h2Factor: 0.001, hangarCapacity: 100 },
+  bumblebee:       { attack: 20,   defense: 25,  cargo: 100,   drives: ['combustion'],         speed: 1.2,  h2Factor: 0.0012, hangarCapacity: 0 },
+  corvette:        { attack: 50,   defense: 60,  cargo: 300,   drives: ['combustion', 'impulse'], speed: 1.5,  h2Factor: 0.0015, hangarCapacity: 0 },
+  light_cruiser:   { attack: 150,  defense: 130, cargo: 800,   drives: ['combustion', 'impulse'], speed: 1.8,  h2Factor: 0.002, hangarCapacity: 0 },
+  heavy_cruiser:   { attack: 300,  defense: 250, cargo: 1500,  drives: ['combustion', 'impulse'], speed: 2.0,  h2Factor: 0.0025, hangarCapacity: 0 },
+  battleship:      { attack: 600,  defense: 500, cargo: 2500,  drives: ['combustion', 'impulse', 'hyperspace'], speed: 2.5,  h2Factor: 0.003, hangarCapacity: 0 },
+  battleship_nexus: { attack: 1500, defense: 1200, cargo: 5000, drives: ['combustion', 'impulse', 'hyperspace', 'nexus'], speed: 3.0, h2Factor: 0.0035, hangarCapacity: 0 },
+  battleship_phoenix:{ attack: 4000, defense: 3000, cargo: 10000, drives: ['combustion', 'impulse', 'hyperspace', 'nexus', 'phoenix'], speed: 4.0, h2Factor: 0.004, hangarCapacity: 0 },
+  carrier_titan:   { attack: 200,  defense: 800, cargo: 50000,  drives: ['hyperspace'],          speed: 1.5,  h2Factor: 0.005, hangarCapacity: 200 },
+  colonizer:       { attack: 0,    defense: 100, cargo: 7500,   drives: ['hyperspace'],          speed: 2.0,  h2Factor: 0.003, hangarCapacity: 0 },
+  invasion_unit:    { attack: 800,  defense: 600, cargo: 2000,  drives: ['hyperspace'],          speed: 2.0,  h2Factor: 0.003, hangarCapacity: 0 },
+  ember_bomb:      { attack: 0,    defense: 0,   cargo: 0,      drives: ['hyperspace'],          speed: 1.0,  h2Factor: 0.001, hangarCapacity: 0 },
 };
 
 export const SHIP_BUILD_TIMES: Record<ShipType, number> = {

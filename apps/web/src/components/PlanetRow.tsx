@@ -9,8 +9,6 @@ interface PlanetRowProps {
     ember: number;
     h2: number;
     energy: number;
-    fieldsUsed: number;
-    fieldsMax: number;
     buildings: { type: string; level: number }[];
   };
 }
@@ -28,7 +26,6 @@ export function PlanetRow({ planet }: PlanetRowProps) {
       <td className="px-4 py-3 text-xs text-admin-text">
         {Math.floor(planet.h2).toLocaleString()} / {Math.floor(planet.energy).toLocaleString()}
       </td>
-      <td className="px-4 py-3 text-xs text-admin-text-dim">{planet.fieldsUsed}/{planet.fieldsMax}</td>
       <td className="px-4 py-3 text-xs text-admin-text-dim">
         {planet.buildings.filter((b) => b.level > 0).length} buildings
       </td>

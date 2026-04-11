@@ -8,8 +8,8 @@ import { SHIP_STATS } from './ships';
 export const PLANET_STEP_DIST = 5;      // DE pro Planeten-Slot (intra-system)
 export const EXIT_SYSTEM_COST = 100;    // DE Pauschal für System-Verlassen
 export const SYSTEM_STEP_DIST = 20;     // DE pro System-Abstand
-export const EXIT_GALAXY_COST = 2000;   // DE Pauschal für Galaxy-Verlassen
 export const GALAXY_STEP_DIST = 500;    // DE pro Galaxy-Abstand
+export const EXIT_GALAXY_COST = 2000;   // DE Pauschal für Galaxy-Verlassen
 
 export type FlightType = 'intraSystem' | 'interSystem' | 'interGalaxy';
 
@@ -18,11 +18,12 @@ export type FlightType = 'intraSystem' | 'interSystem' | 'interGalaxy';
 // interGalaxy = ob Antrieb für Inter-Galaxy-Flüge nutzbar ist
 
 export const DRIVE_EFFECTIVENESS: Record<DriveType, { speed: number; interGalaxy: boolean; h2Factor: number }> = {
-  combustion: { speed: 1.0,  interGalaxy: false, h2Factor: 1.0 },
-  ion:        { speed: 2.5,  interGalaxy: false, h2Factor: 3.0 },
-  hyper:      { speed: 3.0,  interGalaxy: false, h2Factor: 2.0 },
-  nexus:      { speed: 3.0,  interGalaxy: false, h2Factor: 1.5 },
-  interdim:   { speed: 50,   interGalaxy: true,  h2Factor: 10.0 },
+  combustion:      { speed: 1.0,  interGalaxy: false, h2Factor: 1.0 },
+  ion:             { speed: 2.5,  interGalaxy: false, h2Factor: 3.0 },
+  hyperspace:      { speed: 3.0,  interGalaxy: true,  h2Factor: 2.0 },
+  nexus:           { speed: 3.0,  interGalaxy: true,  h2Factor: 1.5 },
+  phoenix:         { speed: 4.0,  interGalaxy: true,  h2Factor: 1.5 },
+  interdim:        { speed: 50,   interGalaxy: true,  h2Factor: 10.0 },
 };
 
 export interface Coordinate {
@@ -49,7 +50,7 @@ export function calculateDistance(origin: Coordinate, target: Coordinate): numbe
 
   if (!sameGalaxy) {
     // 3. Inter-galaxy: Galaxy verlassen + lineare Galaxy-Distanz
-    dist += EXIT_GALAXY_COST + Math.abs(origin.galaxyIndex - target.galaxyIndex) * GALAXY_STEP_COST;
+    dist += EXIT_GALAXY_COST + Math.abs(origin.galaxyIndex - target.galaxyIndex) * GALAXY_STEP_DIST;
   }
 
   return dist;

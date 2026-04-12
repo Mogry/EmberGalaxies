@@ -17,9 +17,9 @@ export const fleetRoutes = new Hono();
 
 // POST /fleet/launch
 fleetRoutes.post('/launch', async (c) => {
+  const playerId = c.get('playerId');
   const body = await c.req.json();
   const {
-    playerId,
     originPlanetId,
     targetPlanetId,
     ships,        // Array<{ type: ShipType, count: number }>
@@ -219,9 +219,14 @@ fleetRoutes.post('/launch', async (c) => {
   return c.json({ fleet, distance, drive: bestDrive, flightSeconds, h2Cost }, 201);
 });
 
-// GET /fleet/player/:playerId
+// GET /fleet/player/:playerId (PRIVATE — only owner can access)
 fleetRoutes.get('/player/:playerId', async (c) => {
   const { playerId } = c.req.param();
+  const authPlayerId = c.get('playerId');
+
+  if (authPlayerId !== playerId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   const fleets = await prisma.fleet.findMany({
     where: { ownerId: playerId },
@@ -234,7 +239,7 @@ fleetRoutes.get('/player/:playerId', async (c) => {
 // POST /fleet/:fleetId/recall
 fleetRoutes.post('/:fleetId/recall', async (c) => {
   const { fleetId } = c.req.param();
-  const { playerId } = await c.req.json();
+  const playerId = c.get('playerId');
 
   const fleet = await prisma.fleet.findUnique({
     where: { id: fleetId },
@@ -268,8 +273,9 @@ fleetRoutes.post('/:fleetId/recall', async (c) => {
   return c.json(updatedFleet);
 });
 
-// POST /fleet/simulate — Trockener Lauf
+// POST /fleet/simulate — Trockener Lauf (only for your own planets)
 fleetRoutes.post('/simulate', async (c) => {
+  const authPlayerId = c.get('playerId');
   const body = await c.req.json();
   const {
     originPlanetId,
@@ -290,6 +296,11 @@ fleetRoutes.post('/simulate', async (c) => {
 
   if (!originPlanet || !targetPlanet) {
     return c.json({ error: 'Planet not found' }, 404);
+  }
+
+  // Only the owner can simulate fleet launches from their planet
+  if (originPlanet.ownerId !== authPlayerId) {
+    return c.json({ error: 'Not your planet' }, 403);
   }
 
   const originCoord = {

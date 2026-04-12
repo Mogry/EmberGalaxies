@@ -42,7 +42,7 @@ gameRoutes.get('/state/:playerId', async (c) => {
   return c.json(player);
 });
 
-// Get all planets in a system
+// Radar Scan — Fog of War: planets only expose id, name, slot, ownerId
 gameRoutes.get('/galaxy/:galaxy/system/:system', async (c) => {
   const galaxyIndex = parseInt(c.req.param('galaxy'));
   const systemIndex = parseInt(c.req.param('system'));
@@ -57,10 +57,20 @@ gameRoutes.get('/galaxy/:galaxy/system/:system', async (c) => {
     return c.json({ error: 'Galaxy not found' }, 404);
   }
 
-  // Find system by galaxyId + index
+  // Find system by galaxyId + index — Fog of War: no resources/buildings/ships on planets
   const system = await prisma.system.findFirst({
     where: { galaxyId: dbGalaxy.id, index: systemIndex },
-    include: { planets: { include: { owner: true } }, star: true },
+    include: {
+      star: true,
+      planets: {
+        select: {
+          id: true,
+          name: true,
+          slot: true,
+          ownerId: true,
+        },
+      },
+    },
   });
 
   if (!system) {
@@ -70,7 +80,7 @@ gameRoutes.get('/galaxy/:galaxy/system/:system', async (c) => {
   return c.json({ galaxy: { ...dbGalaxy, index: galaxyIndex }, system, planets: system.planets });
 });
 
-// Get planet by ID (PUBLIC for all, but only owner gets full details)
+// Get planet by ID — Fog of War: owner sees full data, others see minimal info
 gameRoutes.get('/planet/:planetId', async (c) => {
   const { planetId } = c.req.param();
   const authPlayerId = c.get('playerId');
@@ -78,65 +88,75 @@ gameRoutes.get('/planet/:planetId', async (c) => {
   // Process any expired timers first
   await processExpiredTimers();
 
+  // Phase 1: Minimal query to check ownership
+  const ownership = await prisma.planet.findUnique({
+    where: { id: planetId },
+    select: { ownerId: true },
+  });
+
+  if (!ownership) {
+    return c.json({ error: 'Planet not found' }, 404);
+  }
+
+  // Fog of War: non-owners only see id, name, ownerId, systemId, slot
+  if (ownership.ownerId !== authPlayerId) {
+    const planet = await prisma.planet.findUnique({
+      where: { id: planetId },
+      select: {
+        id: true,
+        name: true,
+        ownerId: true,
+        systemId: true,
+        slot: true,
+      },
+    });
+    return c.json(planet);
+  }
+
+  // Owner gets full details
   const planet = await prisma.planet.findUnique({
     where: { id: planetId },
     include: {
       system: { include: { star: true } },
-      buildings: true,
+      buildings: { include: { constructionQueue: { orderBy: { upgradeFinishAt: 'asc' } } } },
       planetShips: true,
       owner: true,
     },
   });
 
-  if (!planet) {
-    return c.json({ error: 'Planet not found' }, 404);
-  }
-
   // Add galaxyIndex
   const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
-  const galaxyIndex = galaxies.findIndex((g) => g.id === planet.system.galaxyId) + 1;
+  const galaxyIndex = galaxies.findIndex((g) => g.id === planet!.system.galaxyId) + 1;
 
-  // Non-owners only see public data (no resources, buildings, ships)
-  if (planet.ownerId !== authPlayerId) {
-    return c.json({
-      id: planet.id,
-      name: planet.name,
-      slot: planet.slot,
-      ownerId: planet.ownerId,
-      owner: planet.owner ? { id: planet.owner.id, name: planet.owner.name } : null,
-      system: {
-        id: planet.system.id,
-        index: planet.system.index,
-        galaxyIndex,
-        star: planet.system.star ? {
-          temperature: planet.system.star.temperature,
-          energyOutput: planet.system.star.energyOutput,
-        } : null,
-      },
-      isPublic: true,
-    });
-  }
-
-  const planetWithGalaxy = {
-    ...planet,
-    system: { ...planet.system, galaxyIndex },
-  };
-
-  return c.json(planetWithGalaxy);
+  return c.json({ ...planet, system: { ...planet!.system, galaxyIndex } });
 });
 
-// Get player by ID
+// Get player by ID — Fog of War: owner sees full data, others see minimal profile
 gameRoutes.get('/player/:playerId', async (c) => {
   const { playerId } = c.req.param();
+  const authPlayerId = c.get('playerId');
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
+    select: {
+      id: true,
+      name: true,
+      isBot: true,
+      createdAt: true,
+      // apiKey is NEVER exposed — not even to the owner via this endpoint
+    },
   });
 
   if (!player) {
     return c.json({ error: 'Player not found' }, 404);
   }
 
+  // Non-owners only see the public profile
+  if (authPlayerId !== playerId) {
+    return c.json(player);
+  }
+
+  // Owner gets the same public profile here; full state is via /state/:playerId
   return c.json(player);
 });
 

@@ -3,9 +3,14 @@ import { prisma } from '../db/client';
 
 export const researchRoutes = new Hono();
 
-// Get research for a player
+// Get research for a player (PRIVATE — only owner can access)
 researchRoutes.get('/player/:playerId', async (c) => {
   const { playerId } = c.req.param();
+  const authPlayerId = c.get('playerId');
+
+  if (authPlayerId !== playerId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   const research = await prisma.research.findMany({
     where: { playerId },
@@ -16,8 +21,10 @@ researchRoutes.get('/player/:playerId', async (c) => {
 
 // Start research
 researchRoutes.post('/start', async (c) => {
+  const authPlayerId = c.get('playerId');
   const body = await c.req.json();
-  const { playerId, researchType } = body;
+  const { researchType } = body;
+  const playerId = authPlayerId;
 
   const existing = await prisma.research.findUnique({
     where: { playerId_type: { playerId, type: researchType } },

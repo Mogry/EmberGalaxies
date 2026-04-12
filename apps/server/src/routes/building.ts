@@ -6,9 +6,24 @@ import { processExpiredTimers } from '../utils/timerCompletion';
 
 export const buildingRoutes = new Hono();
 
-// Get buildings for a planet
+// Get buildings for a planet (PRIVATE — only owner can access)
 buildingRoutes.get('/planet/:planetId', async (c) => {
   const { planetId } = c.req.param();
+  const authPlayerId = c.get('playerId');
+
+  // Verify ownership
+  const planet = await prisma.planet.findUnique({
+    where: { id: planetId },
+    select: { ownerId: true },
+  });
+
+  if (!planet) {
+    return c.json({ error: 'Planet not found' }, 404);
+  }
+
+  if (planet.ownerId !== authPlayerId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   // Process any expired timers first so queue reflects correct state
   await processExpiredTimers();
@@ -35,6 +50,7 @@ function canAfford(planet: { iron: number; silver: number; ember: number; h2: nu
 
 // Start building upgrade
 buildingRoutes.post('/upgrade', async (c) => {
+  const authPlayerId = c.get('playerId');
   const body = await c.req.json();
   const { planetId, buildingType } = body;
 
@@ -70,6 +86,11 @@ buildingRoutes.post('/upgrade', async (c) => {
   const planet = await prisma.planet.findUnique({ where: { id: planetId } });
   if (!planet) {
     return c.json({ error: 'Planet not found' }, 404);
+  }
+
+  // Ownership check
+  if (planet.ownerId !== authPlayerId) {
+    return c.json({ error: 'Forbidden' }, 403);
   }
 
   // Check affordability
@@ -117,8 +138,21 @@ buildingRoutes.post('/upgrade', async (c) => {
 
 // Cancel building upgrade
 buildingRoutes.post('/cancel', async (c) => {
+  const authPlayerId = c.get('playerId');
   const body = await c.req.json();
   const { planetId, queueId } = body;
+
+  // Ownership check
+  const planetOwner = await prisma.planet.findUnique({
+    where: { id: planetId },
+    select: { ownerId: true },
+  });
+  if (!planetOwner) {
+    return c.json({ error: 'Planet not found' }, 404);
+  }
+  if (planetOwner.ownerId !== authPlayerId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   const queueEntry = await prisma.constructionQueue.findUnique({
     where: { id: queueId },
@@ -169,6 +203,7 @@ buildingRoutes.post('/cancel', async (c) => {
 
 // Start new building construction
 buildingRoutes.post('/construct', async (c) => {
+  const authPlayerId = c.get('playerId');
   const body = await c.req.json();
   const { planetId, buildingType } = body;
 
@@ -193,6 +228,11 @@ buildingRoutes.post('/construct', async (c) => {
 
   if (!planet) {
     return c.json({ error: 'Planet not found' }, 404);
+  }
+
+  // Ownership check
+  if (planet.ownerId !== authPlayerId) {
+    return c.json({ error: 'Forbidden' }, 403);
   }
 
   // Check if building already exists

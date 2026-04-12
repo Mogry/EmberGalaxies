@@ -5,9 +5,24 @@ import { SHIP_BUILD_TIMES, SHIP_COSTS } from '@ember-galaxies/shared';
 
 export const shipyardRoutes = new Hono();
 
-// GET /api/shipyard/planet/:planetId — returns queue + stock
+// GET /api/shipyard/planet/:planetId — returns queue + stock (PRIVATE — only owner)
 shipyardRoutes.get('/planet/:planetId', async (c) => {
   const { planetId } = c.req.param();
+  const authPlayerId = c.get('playerId');
+
+  // Verify ownership
+  const planet = await prisma.planet.findUnique({
+    where: { id: planetId },
+    select: { ownerId: true },
+  });
+
+  if (!planet) {
+    return c.json({ error: 'Planet not found' }, 404);
+  }
+
+  if (planet.ownerId !== authPlayerId) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
 
   const [queue, stock] = await Promise.all([
     prisma.shipyard.findMany({
@@ -23,6 +38,7 @@ shipyardRoutes.get('/planet/:planetId', async (c) => {
 
 // POST /api/shipyard/build
 shipyardRoutes.post('/build', async (c) => {
+  const authPlayerId = c.get('playerId');
   const body = await c.req.json();
   const { planetId, shipType, count = 1 } = body;
 
@@ -62,6 +78,11 @@ shipyardRoutes.post('/build', async (c) => {
   const planet = await prisma.planet.findUnique({ where: { id: planetId } });
   if (!planet) {
     return c.json({ error: 'Planet not found' }, 404);
+  }
+
+  // Ownership check
+  if (planet.ownerId !== authPlayerId) {
+    return c.json({ error: 'Forbidden' }, 403);
   }
 
   if (
@@ -106,6 +127,7 @@ shipyardRoutes.post('/build', async (c) => {
 
 // POST /api/shipyard/cancel
 shipyardRoutes.post('/cancel', async (c) => {
+  const authPlayerId = c.get('playerId');
   const body = await c.req.json();
   const { planetId, shipType } = body;
 
@@ -116,6 +138,11 @@ shipyardRoutes.post('/cancel', async (c) => {
 
   if (!ship) {
     return c.json({ error: 'Ship not found' }, 404);
+  }
+
+  // Ownership check
+  if (ship.planet.ownerId !== authPlayerId) {
+    return c.json({ error: 'Forbidden' }, 403);
   }
 
   if (!ship.isBuilding) {

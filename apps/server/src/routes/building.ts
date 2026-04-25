@@ -55,9 +55,10 @@ buildingRoutes.post('/upgrade', async (c) => {
   const { planetId, buildingType } = body;
 
   // Check if ANY building on this planet has an active queue (max 1 upgrade per planet)
+  const now = new Date();
   const buildingsWithQueue = await prisma.building.findMany({
     where: { planetId },
-    include: { constructionQueue: true },
+    include: { constructionQueue: { where: { upgradeFinishAt: { gt: now } } } },
   });
 
   const hasActiveQueue = buildingsWithQueue.some(b =>
@@ -112,6 +113,10 @@ buildingRoutes.post('/upgrade', async (c) => {
         h2: { decrement: cost.h2 ?? 0 },
         energy: { decrement: cost.energy ?? 0 },
       },
+    }),
+    prisma.building.update({
+      where: { id: existing.id },
+      data: { isUpgrading: true, upgradeFinishAt: finishAt },
     }),
     prisma.constructionQueue.create({
       data: {
@@ -208,9 +213,10 @@ buildingRoutes.post('/construct', async (c) => {
   const { planetId, buildingType } = body;
 
   // Check if ANY building on this planet has an active queue (max 1 upgrade per planet)
+  const now = new Date();
   const buildingsWithQueue = await prisma.building.findMany({
     where: { planetId },
-    include: { constructionQueue: true },
+    include: { constructionQueue: { where: { upgradeFinishAt: { gt: now } } } },
   });
 
   const hasActiveQueue = buildingsWithQueue.some(b =>
@@ -274,6 +280,10 @@ buildingRoutes.post('/construct', async (c) => {
         h2: { decrement: cost.h2 ?? 0 },
         energy: { decrement: cost.energy ?? 0 },
       },
+    }),
+    prisma.building.update({
+      where: { id: building.id },
+      data: { isUpgrading: true, upgradeFinishAt: finishAt },
     }),
     prisma.constructionQueue.create({
       data: {

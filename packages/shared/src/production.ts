@@ -68,11 +68,11 @@ export function calculateOfflineProduction(
   const productionPerHour = calculatePlanetProduction(buildings, researchBonus, planetModifier);
 
   return {
-    iron: productionPerHour.iron * hoursElapsed,
-    silver: productionPerHour.silver * hoursElapsed,
-    ember: productionPerHour.ember * hoursElapsed,
-    h2: productionPerHour.h2 * hoursElapsed,
-    energy: productionPerHour.energy * hoursElapsed,
+    iron: productionPerHour.iron * hoursElapsed * 10,
+    silver: productionPerHour.silver * hoursElapsed * 10,
+    ember: productionPerHour.ember * hoursElapsed * 10,
+    h2: productionPerHour.h2 * hoursElapsed * 10,
+    energy: productionPerHour.energy * hoursElapsed * 10,
   };
 }
 

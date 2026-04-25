@@ -1204,9 +1204,6 @@ export async function processExpiredTimers(): Promise<CompletedResult> {
   });
 
   for (const { playerId } of researchPlayerIds) {
-    // Skip players whose research is already handled via syncPlanet (they own planets)
-    if (playerIdsWithPlanets.has(playerId)) continue;
-
     const expiredResearch = await prisma.research.findMany({
       where: { playerId, isResearching: true, researchFinishAt: { lte: now } },
     });

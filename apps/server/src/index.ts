@@ -12,6 +12,7 @@ import { apiKeyAuth } from './middleware/apiKeyAuth';
 import { adminRoutes } from './routes/admin';
 import { adminAuth } from './middleware/adminAuth';
 import { globalRateLimit, heavyRateLimit } from './middleware/rateLimit';
+import { processExpiredTimers } from './utils/timerCompletion';
 
 const { websocket, upgradeWebSocket } = createBunWebSocket();
 
@@ -131,3 +132,12 @@ export default {
 };
 
 console.log('🚀 Server running at http://0.0.0.0:3000');
+
+// Game loop — process expired timers every 30 seconds
+setInterval(async () => {
+  try {
+    await processExpiredTimers();
+  } catch (error) {
+    console.error('Game loop error:', error);
+  }
+}, 30000);

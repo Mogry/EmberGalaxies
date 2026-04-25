@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { prisma } from '../db/client';
-import { processExpiredTimers, touchPlanets } from '../utils/timerCompletion';
+import { processExpiredTimers, syncPlanet, touchPlanets } from '../utils/timerCompletion';
 import { logEvent } from '../utils/eventLogger';
 import { DEV_MODE } from '../utils/dev';
 
@@ -19,8 +19,18 @@ gameRoutes.get('/state/:playerId', async (c) => {
   // Process any expired timers before returning state
   await processExpiredTimers();
 
+  // Sync all player planets to compute offline production
+  const playerPlanets = await prisma.planet.findMany({
+    where: { ownerId: playerId },
+    select: { id: true },
+  });
+  const now = new Date();
+  for (const { id } of playerPlanets) {
+    await syncPlanet(id, now);
+  }
+
   // Update lastSeen for all player's planets
-  await touchPlanets(playerId);
+  await touchPlanets(playerId, now);
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
@@ -87,6 +97,7 @@ gameRoutes.get('/planet/:planetId', async (c) => {
 
   // Process any expired timers first
   await processExpiredTimers();
+  await syncPlanet(planetId, new Date());
 
   // Phase 1: Minimal query to check ownership
   const ownership = await prisma.planet.findUnique({
@@ -259,6 +270,14 @@ gameRoutes.get('/planets/:playerId', async (c) => {
   await processExpiredTimers();
 
   const galaxies = await prisma.galaxy.findMany({ orderBy: { createdAt: 'asc' } });
+  const now = new Date();
+  const planetIds = await prisma.planet.findMany({
+    where: { ownerId: playerId },
+    select: { id: true },
+  });
+  for (const { id } of planetIds) {
+    await syncPlanet(id, now);
+  }
 
   const planets = await prisma.planet.findMany({
     where: { ownerId: playerId },
